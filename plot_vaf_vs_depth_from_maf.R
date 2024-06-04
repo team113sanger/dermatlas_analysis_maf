@@ -1,5 +1,3 @@
-.libPaths(c("/software/team113/dermatlas/R/R-4.2.2/lib/R/library/"
-
 suppressMessages(library(dplyr))
 suppressMessages(library(ggplot2))
 suppressMessages(library(reshape2))
@@ -11,6 +9,7 @@ suppressMessages(library(GetoptLong))
 genefile <- NULL
 colname <- NULL
 suffix <- NULL
+samplefile <- NULL
 
 type <- "pdf"
 ncol_r <- 4
@@ -34,6 +33,7 @@ the variants file, or a subset of genes specified from a list of genes.
   Options:
     <file=s> Variants file [required]
     <genefile=s> List of genes to include. 
+    <samplefile=s> List of samples to include.
     <colname=s> Column in variants file with gene name matching the gene list. Required with --genelist
     <suffix=s> Suffix to be added to output files when using a custom gene list. Required with --genelist
     <noindels> Ingore indels (only SNVs and MNVs will be considered)
@@ -59,7 +59,7 @@ top_sites <- function(df) {
 		#arrange(-n, Chromosome, POS_VCF) %>% 
 		arrange(-n, Gene, POS_VCF) %>% 
 		distinct() %>%
-		unite("Gene_Name_Site", c(Hugo_Symbol, Gene, POS_VCF), sep = "/", remove = F) %>%
+		unite("Gene_Name_Site", c(Hugo_Symbol, Gene, POS_VCF, Tumor_Seq_Allele2), sep = "/", remove = F) %>%
 		unite("Gene_Name", c(Hugo_Symbol, Gene), sep = "/", remove = F) %>%
 		slice(1:12) %>%
 		data.frame
@@ -312,6 +312,13 @@ if (! is.null(genefile)) {
 	stop("Cannot select both --noIndels and --indels_only")
 }
 
+# Read in sample list file if specified
+
+if (! is.null(samplefile)) {
+	print(paste("Reading sample list", samplefile))
+	samplelist <- read.table(samplefile, header = F, sep = "\t", stringsAsFactors = F, quote = "")
+}
+
 # Read variants file
 
 df <- read.table(file, header = T, sep = "\t", stringsAsFactors = F, quote = "", fill = FALSE)
@@ -320,7 +327,12 @@ df <- read.table(file, header = T, sep = "\t", stringsAsFactors = F, quote = "",
 
 df_all <- df
 
-all_samples <- sort(unique(df_all$Tumor_Sample_Barcode))
+all_samples <- ""
+if (! is.null(samplefile)) {
+	all_samples <- sort(samplelist$V1)
+} else {
+	all_samples <- sort(unique(df_all$Tumor_Sample_Barcode))
+}
 
 # Process the variants
 
@@ -366,6 +378,18 @@ if (nrow(df_snv_only) > 0) {
 }
 
 
+# Plot recurrent genes
+# Set levels for Chrom
+
+#chr_order <- df %>%
+#	filter(! df$Chromosome %in% c('X', 'Y')) %>%
+#	select(Chromosome) %>%
+#	unique() %>%
+#	arrange()
+#
+#
+#chr_order <- c(as.character(chr_order$Chromosome), "X", "Y")
+#df$Chromosome <- factor(df$Chromosome, levels = chr_order)
 
 # Get subset of genes, if gene list provided
 
@@ -398,14 +422,16 @@ if (isTRUE(noindels)) {
 # Get the top recurrent sites
 
 top_12_sites <- top_sites(df)
-
+#print("top_12_sites")
+#write.table(file="test.tsv", top_12_sites, quote=F, sep="\t")
 # Get the original rows for the top sites
 
 sites_df <- df %>% semi_join(top_12_sites, by = c("Gene", "Chromosome", "POS_VCF", "Reference_Allele", "Tumor_Seq_Allele2")) %>%
-			unite("Gene_Name_Site", c(Hugo_Symbol, Gene, POS_VCF), sep = "/", remove = F)
-
+			unite("Gene_Name_Site", c(Hugo_Symbol, Gene, POS_VCF, Tumor_Seq_Allele2), sep = "/", remove = F)
+#sites_df
 # Get the gene order for plotting
 
+#gene_order <- unique(top_12_sites$Gene_Name)
 gene_order <- top_12_sites$Gene_Name_Site
 
 # Set the gene order and mutation levels for plotting 
@@ -415,8 +441,8 @@ sites_df$Mutation <- factor(sites_df$Mutation, levels = mut_order)
 # Make a VAF vs Read Depth plot
 facet_labels <- top_12_sites$Gene_Name
 names(facet_labels) <- gene_order
+#print(facet_labels)
 sites_plot <- make_plots(sites_df, ncol_r, facet_labels)
-
 sites_filename <- make_file_name("AF_vs_depth_recurrent", "sites", suffix, noindels, indels_only, protein_alt)
 print_plot(sites_plot, sites_filename, width_r, height_r)
 
@@ -428,6 +454,7 @@ write_var_table(sites_df, sites_tsv_filename)
 top_12_genes <- top_genes(df)
 
 print("Top recurrently mutated genes")
+#head(top_12_genes, 20)
 
 # Get the original rows for the top genes
 
@@ -435,6 +462,7 @@ genes_df <- df %>% semi_join(top_12_genes, by = c("Gene", "Hugo_Symbol"))
 
 # Get the gene order for plotting
 
+#gene_order2 <- unique(top_12_genes$Gene_Name)
 gene_order2 <- top_12_genes$Gene_Name
 
 # Set the gene order and mutation levels for plotting 

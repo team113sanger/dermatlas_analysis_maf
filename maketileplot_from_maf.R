@@ -1,6 +1,3 @@
-.libPaths(c("/software/team113/dermatlas/R/R-4.2.2/lib/R/library/"))
-.libPaths()
-
 suppressMessages(library(ggplot2))
 suppressMessages(library(reshape2))
 suppressMessages(library(plyr))
@@ -543,8 +540,8 @@ make_mutation_plot <- function(data, legendpos = "top", nrow = 2, ncol = 5, vlin
 
 	# plot each layer
 	plot <- ggplot(singles, aes(x = Sample.index, y = Gene)) +
-		geom_tile(aes(fill = Effect, width = 1, height = 1), colour = "white", size = 0.005, alpha = 0.75) +
-		geom_tile(data = missing, aes(fill = Effect, width = 1, height = 1), colour = "white", size = 0.005, alpha = 0.75) +
+		geom_tile(aes(fill = Effect, width = 1, height = 1), colour = "white", linewidth = 0.2, alpha = 0.75) +
+		geom_tile(data = missing, aes(fill = Effect, width = 1, height = 1), colour = "white", linewidth = 0.2, alpha = 0.75) +
 		theme_bw() +
 		theme(axis.line = element_blank(), axis.title.y = element_blank(), axis.title.x = element_blank(),
 			axis.ticks.y = element_blank(), axis.ticks.x = element_blank(), 
@@ -572,11 +569,11 @@ make_mutation_plot <- function(data, legendpos = "top", nrow = 2, ncol = 5, vlin
 
 	print("Checking data.first")
 	if(nrow(as.data.frame(data.first)) > 0) {
-		plot <- plot + geom_tile(data = data.first, aes(fill = Effect, width  =  0.5, height = 1), colour = "white", size = 0.005, alpha = 0.75)
+		plot <- plot + geom_tile(data = data.first, aes(fill = Effect, width  =  0.5, height = 1), colour = "white", linewidth = 0.2, alpha = 0.75)
 	}
 	print("Checking data.second")
 	if(nrow(as.data.frame(data.second)) > 0) {
-		plot <- plot + geom_tile(data = data.second, aes(fill = Effect, width  =  0.5, height = 1), colour = "white", size = 0.005, alpha = 0.75)
+		plot <- plot + geom_tile(data = data.second, aes(fill = Effect, width  =  0.5, height = 1), colour = "white", linewidth = 0.2, alpha = 0.75)
 	}
 #	print("Checking multiples")
 #	if(nrow(as.data.frame(multiples)) > 1) {
@@ -602,7 +599,7 @@ make_frequency_plot <- function(data, gene_col, perc_col, group) {
 	max_scale <- max_scale + 1
 
 	plot <- ggplot(data, aes(x = !!as.name(group), y = !!as.name(gene_col), fill = !!as.name(perc_col))) +
-		geom_tile(aes(width = 0.5, height = 1), colour = "white", size = 0.01, alpha = 0.75) +
+		geom_tile(aes(width = 0.5, height = 1), colour = "white", linewidth = 0.2, alpha = 0.75) +
 			theme_bw() + theme(axis.line = element_blank(), axis.title.y = element_blank(), axis.title.x = element_blank(),
 			axis.ticks.y = element_blank(), axis.ticks.x = element_blank(),
 			axis.text.y = element_blank(),

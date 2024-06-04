@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 no warnings 'experimental::smartmatch';
-use List::MoreUtils qw(firstidx);
+use List::MoreUtils qw(firstidx uniq);
 use List::Util qw(max);
 use File::Basename;
 use Getopt::Long;
@@ -19,10 +19,12 @@ my $tum_vaf;
 my $vaf_filter_type;
 my $indel_filter;
 my $common_snp_filter;
+my $keep_multi;
 my $cutoff;
 my $print_header = 0;
 my @main_csq_header;
 my $sample_list;
+my @sample_list;
 
 
 GetOptions ("vcflist=s"     => \$vcflist,
@@ -36,6 +38,7 @@ GetOptions ("vcflist=s"     => \$vcflist,
 			"vaf_filter_type=s" => \$vaf_filter_type,
 			"indel_filter"  => \$indel_filter,
 			"dbsnp_filter"  => \$common_snp_filter,
+			"keep_multi"    => \$keep_multi,
             "sample_list:s" => \$sample_list);
 
 if (!$vcflist) {
@@ -46,8 +49,8 @@ if (!$vcflist) {
 	Usage: reformat_vcf2maf.pl --vcflist [file] 
 	
 	where file is a file with a list of VCF files (full or relative paths). File formats
-	parsed are MuTect (v1), Strelka2, cgpCaVEMan and cgpPindel and may be a combination
-	of any of these. VCF type will be determined by header information.
+	parsed are MuTect (v1), Strelka2, Mutect2, GATK gemline, cgpCaVEMan and cgpPindel 
+	and may be a combination of any of these. VCF type will be determined by header information.
 
 	Optional:
 
@@ -67,7 +70,8 @@ if (!$vcflist) {
 		--sample_list [file]  Print to file a list of tumour and normal samples from the VCF list.
 		--vaf_filter_type [all|snv|indel]   Apply --tum_vaf cutoff to this type pf variant only. snv includes mnvs from Caveman/Mutetct.
 		--indel_filter        Apply indel filtering based on REF and ALT length, VAF and T/N depth; remove ONPs
-		--dbsnp_filter          Exclude variants flagged with "dbSNP=COMMON" in the INFO column
+		--dbsnp_filter        Exclude variants flagged with "dbSNP=COMMON" in the INFO column
+		--keep_multi          Skip multi-allelic sites (ALT allele has at least one comma ",")
 
 END
 	exit;
@@ -110,9 +114,16 @@ print STDERR "--tum_vaf: $cutoff\n" if $cutoff;
 print STDERR "--indel_filter: $indel_filter\n" if $indel_filter;
 print STDERR "--dbsnp_filter: $common_snp_filter\n" if $common_snp_filter;
 print STDERR "--vaf_filter_type: $vaf_filter_type\n" if $vaf_filter_type;
+print STDERR "--keep_multi: $keep_multi\n" if $keep_multi;
 
 if ($check_af == 0) {
 	print STDERR "Option --af_col not used; 'voi' and 'keep' will not consider population frequencies\n";
+}
+
+if ($keep_multi) {
+	print STDERR "Keep and split multi-allelic sites\n"
+} else {
+	print STDERR "Skipping multi-allelic sites with ',' in the ALT column\n";
 }
 
 my @vcflist = `cat $vcflist`;
@@ -157,13 +168,17 @@ if ($sample_list) {
 	open SAM, ">$sample_list" || die "Can't open $sample_list\n";
 }
 
+my @samples;
+
 # Process each VCF
 foreach my $vcf (@vcflist) {
 	my @csq_header;
 	my $mutect = 0;
+	my $mutect2 = 0;
 	my $strelka = 0;
 	my $caveman = 0;
 	my $pindel = 0;
+	my $gatk_hc = 0;
 
 	print STDERR "Processing $vcf\n";
 	if ($vcf =~ /\.gz/) {
@@ -205,21 +220,28 @@ foreach my $vcf (@vcflist) {
 				%csq_check_headers = parse_csq_header(\@csq_header, @headers_to_check);
 				if ($print_header == 0) {
 					foreach my $remove ("Hugo_Symbol", "Existing_variation", "SOURCE") {
-						$main_csq_header[$csq_check_headers{$remove}] = "REMOVE";
+						$main_csq_header[$csq_check_headers{$remove}] = "REMOVE" if $csq_check_headers{$remove};
 					}
 					@main_csq_header = grep {$_ ne 'REMOVE'} @main_csq_header; 
 					# Print out main header
 					print join("\t", @header, @main_csq_header) . "\n";
 					$print_header = 1;
 				}
-			} elsif ($line =~ /##GATKCommandLine/) {
-				$normal = $1 if /normal_sample_name=(\S+)/;
-				$tumour = $1 if /tumor_sample_name=(\S+)/;
+			} elsif ($line =~ /##GATKCommandLine/ && $line =~ /tumor/ && $line !~ /Mutect2/) {
+				$normal = $1 if $line =~ /normal_sample_name=(\S+)/;
+				$tumour = $1 if $line =~ /tumor_sample_name=(\S+)/;
 				if (!$normal || !$tumour) {
 					die "No tumour or normal sample found in Mutect file header.\n";
 				}
 				$mutect = 1;
-				print STDERR "Inferring Mutect format\n";
+				print STDERR "Inferring Mutect_v1 format\n";
+			} elsif ($line =~ /##GATKCommandLine=<ID=Mutect2/) {
+				$mutect2 = 1;
+				print STDERR "Inferring Mutect2 format\n";
+				print STDERR "Multi-allelic sites will be skipped for Mutect2 calls\n";
+			} elsif ($line =~ /##GATKCommandLine/ && $line !~ /Mutect2/) {
+				$gatk_hc = 1;
+				print STDERR "Inferring GATK germline format\n";
 			} elsif ($line =~ /##cmdline=\S+Strelka/) {
 				if ($line =~ /--normalBam=\S+\/([^\/]+).sample.dupmarked.bam/) {
 					$normal = $1;
@@ -242,9 +264,13 @@ foreach my $vcf (@vcflist) {
 				$normal = $1;
 			} elsif ($line =~ /^##SAMPLE=<ID=TUMOUR.+SampleName=([^,>]+)/) {
 				$tumour = $1;
+			} elsif ($line =~ /^##normal_sample=(\S+)/) {
+				$normal = $1;
+			} elsif ($line =~ /^##tumor_sample=(\S+)/) {
+				$tumour = $1;
 			} elsif ($line =~ /#CHR/) {
 				my @colnames = split(/\t/, $line);
-				if ($mutect == 1) {
+				if ($mutect == 1 || $mutect2 == 1) {
 					if (!$normal || !$tumour) {
 						die "Can't find tumour and normal sample names in VCF header.";
 					} elsif ($colnames[9] eq $normal && $colnames[10] eq $tumour) {
@@ -262,208 +288,289 @@ foreach my $vcf (@vcflist) {
 					}
 					$norm_index = 9;
 					$tum_index = 10;
+				} elsif ($gatk_hc == 1) {
+					@samples = @colnames[9..$#colnames];
+					chomp @samples;
+					$norm_index = 9;
+					#$tumour = "NA";
 				} else {
-					die "Cannot find Mutect, Strelka, Pindel or CaVEMan VCF headers\n";
+					die "Cannot find GATK, Mutect, Strelka, Pindel or CaVEMan VCF headers\n";
 				}
 				# Write a list of t and n pairs
 				if ($sample_list) {
-					print SAM "$tumour\t$normal\n";
+					if ($gatk_hc != 1) {
+						push @sample_list, "$tumour\t$normal\n";
+						#print SAM "$tumour\t$normal\n";
+					} elsif ($gatk_hc == 1) {
+						push @sample_list, join("\n", @samples);
+						#print SAM join("\n", @samples);
+					}
 				}
 			}
 			next;
 		}
-
 		# Process the VCF line
-		my @c = split(/\t/, $line);
-		my ($chrom, $pos, $ids, $ref, $alt, $qual, $passfilt) = @c[0..6];
-		my ($info, $csq) = ($1, $2) if $c[7] =~ /(\S+)CSQ=([^;\s]+)/;
-		# This check handles the rare case where Pindel outputs REF==ALT,
-		# in which case VEP does not provide an CSQ
-		if (!$csq) {
-			print STDERR "WARNING: SKIPPING LINE - No CSQ for $line\n";
-			next;
+		# If file is GATK-HC germline, split the lines up by sample
+		# make parsing easier
+		my @lines;
+		my @gatk_hc_samples;
+		if ($gatk_hc == 1) {
+			my @cols = split(/\t/, $line);
+			foreach my $sample_index (0..$#samples) {
+				my $index = 9 + $sample_index;
+				my $sample_format = $cols[$index];
+				next if $sample_format =~ /^0\S0/ || $sample_format =~ /^\S\S\.:/ || $sample_format =~ /^\.\S\S:/;
+				push @lines, join("\t", @cols[0..8], $sample_format);
+				push @gatk_hc_samples, $samples[$sample_index];
+			}
+		} else {
+			push @lines, $line;
 		}
-
-		# Skip if FILTER ne PASS and $pass defined
-		if ($c[6] ne 'PASS' && $pass) {
-			print STDERR "Skipping $line\n";
-			next;
-		}
-
-		# Skip if --dbsnp_filter and found COMMON
-		if ($common_snp_filter && $c[7] =~ /dbSNP=COMMON/) {
-			print STDERR "Skipping common snp $line\n";
-			next;
-		}
-
-		# Calculate the start and end postitions, ref and alt allleles, variant type for maftools format
-		#my ($pos_start, $pos_end, $ref_maf, $alt_maf) = calc_positions($pos, $type, $len, $ref, $alt);
-		my ($pos_start, $pos_end, $ref_maf, $alt_maf, $type, $len) = calc_positions($pos, $ref, $alt);
-
-		# Parse tumour and normal format columns
-		my $vaf;
-		my $vaf_norm;
-		my $tum_counts;
-		my $norm_counts;
-		my $dp_tum;
-		my $dp_norm;
-
-		my @format = split(/:/, $c[8]);
-		my @tum_format = split (/:/, $c[$tum_index]);
-		my @norm_format = split (/:/, $c[$norm_index]);
-
-		# Parse the FORMAT column
-		if ($mutect == 1) {
-			($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = mutect_stats(\@format, \@tum_format, \@norm_format);
-		} elsif ($strelka == 1) {
-			($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = strelka_stats(\@format, \@tum_format, \@norm_format);
-		} elsif ($caveman == 1) {
-			($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = caveman_stats(\@format, \@tum_format, \@norm_format, $ref, $alt);
-		} elsif ($pindel == 1) {
-			($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = pindel_stats(\@format, \@tum_format, \@norm_format, $ref, $alt);
-		}
-		
-		# Apply a hard tumour VCF cutoff if provided by user
-		if ($cutoff && $vaf < $cutoff) {
-			if ($vaf_filter_type eq 'all' || ($vaf_filter_type eq 'indel' && ($strelka == 1 || $pindel == 1)) || ($vaf_filter_type eq 'snv' && ($mutect == 1 || $caveman == 1))) {
-				print STDERR "Skipping : low tumour VAF in $line\n";
+		foreach my $vcfline_num (0..$#lines) {
+			my @c = split(/\t/, $lines[$vcfline_num]);
+			my ($chrom, $pos, $ids, $ref, $alt, $qual, $passfilt) = @c[0..6];
+			my ($info, $csq) = ($1, $2) if $c[7] =~ /(\S+)CSQ=([^;\s]+)/;
+			# This check handles the rare case where Pindel outputs REF==ALT,
+			# in which case VEP does not provide an CSQ
+			if (!$csq) {
+				print STDERR "WARNING: SKIPPING LINE - No CSQ for $line\n";
 				next;
 			}
-		}
 
-		# Additional filtering for indels
-		# Keep if length of indel is less than 25 bp but not a complex indel with both alleles > 10, or ONP
-		# if not, keep if tum VAF > 0.25 and depth in T and N are both >= 20. Subtract 1 to length to account for anchor base
-		if ($indel_filter && ($strelka == 1 || $pindel == 1)) {
-			if (! (length($ref) - 1 <= 25 && length($alt) - 1 <= 25 && !(length($ref) - 1 > 10 && length($alt) - 1 > 10) && $type ne 'ONP')) {
-				if ($vaf > 0.25 && $dp_tum >= 20 && $dp_norm >= 20 && $type ne 'ONP') {
-					# do nothing
-				} else {
-					print STDERR "Skipping2: $line\n";
-					next;
+			# Skip if FILTER ne PASS and $pass defined
+			if ($c[6] ne 'PASS' && $pass) {
+				print STDERR "Skipping $line\n";
+				next;
+			}
+
+			# Skip if --dbsnp_filter and found COMMON
+			if ($gatk_hc != 1 && $common_snp_filter && $c[7] =~ /dbSNP=COMMON/) {
+				print STDERR "Skipping common snp $line\n";
+				next;
+			}
+
+			# Skip if --keep_multi and ALT has multiple alleles
+			# Or format is Mutect2 (all multi-allelic sites are flagged anyway
+			if ($alt =~ /,/ && (! $keep_multi || $mutect2 == 1)) {
+				print STDERR "Skipping multi-allelic site $line\n";
+				next;
+			}
+
+			# Iterate through the different alternative alleles
+			my @alts = split(/,/, $alt);
+			foreach my $alt_num (0..$#alts) {
+				next if $alts[$alt_num] eq "*";
+				$alt = $alts[$alt_num];
+
+				# Calculate the start and end postitions, ref and alt allleles, variant type for maftools format
+				#my ($pos_start, $pos_end, $ref_maf, $alt_maf) = calc_positions($pos, $type, $len, $ref, $alt);
+				my ($pos_start, $pos_end, $ref_maf, $alt_maf, $type, $len) = calc_positions($pos, $ref, $alt);
+
+				# Parse tumour and normal format columns
+				my $vaf;
+				my $vaf_norm;
+				my $tum_counts;
+				my $norm_counts;
+				my $dp_tum;
+				my $dp_norm;
+
+				my @format = split(/:/, $c[8]);
+
+				my @tum_format = split (/:/, $c[$tum_index]) if $gatk_hc != 1;
+				my @norm_format = split (/:/, $c[$norm_index]);
+
+				# Parse the FORMAT column
+				if ($mutect == 1) {
+					($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = mutect_stats(\@format, \@tum_format, \@norm_format);
+				} elsif ($mutect2 == 1) {
+					#($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = mutect2_stats(\@format, \@tum_format, \@norm_format);
+					#($vaf_norm, $norm_counts, $dp_norm)  = gatkhc_stats(\@format, \@norm_format);
+					($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = mutect2_stats(\@format, \@tum_format, \@norm_format);
+					if ($vaf_norm eq 'NA') {
+						print STDERR "Skipping non-ref multiallelic : $line\n";
+						next;
+					}
+				} elsif ($strelka == 1) {
+					($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = strelka_stats(\@format, \@tum_format, \@norm_format);
+				} elsif ($caveman == 1) {
+					($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = caveman_stats(\@format, \@tum_format, \@norm_format, $ref, $alt);
+				} elsif ($pindel == 1) {
+					($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp_tum, $dp_norm)  = pindel_stats(\@format, \@tum_format, \@norm_format, $ref, $alt);
+				} elsif ($gatk_hc == 1) {
+					($vaf_norm, $norm_counts, $dp_norm)  = gatkhc_stats(\@format, \@norm_format, $alt_num);
+					if ($vaf_norm eq 'NA') {
+						print STDERR "Skipping non-ref multiallelic : $line\n";
+						next;
+					}
+					$tum_counts = "NA\tNA";
+					$vaf  = "NA";
+					$dp_tum = "NA";
+					$normal = $gatk_hc_samples[$vcfline_num];
+					$tumour = $gatk_hc_samples[$vcfline_num];
 				}
+			
+				# Apply a hard tumour VCF cutoff if provided by user
+				if ($gatk_hc != 1 && $cutoff && $vaf < $cutoff) {
+					if ($vaf_filter_type eq 'all' || ($vaf_filter_type eq 'indel' && ($strelka == 1 || $pindel == 1)) || ($vaf_filter_type eq 'snv' && ($mutect == 1 || $caveman == 1))) {
+						print STDERR "Skipping : low tumour VAF in $line\n";
+						next;
+					}
+				} elsif ($gatk_hc == 1 && $cutoff && $vaf < $cutoff) {
+					my $type;
+					if (length($ref) == length($alt)) {
+						$type = 'snv'; # filter snv and mnv the same way
+					} else {
+						$type = 'indel';
+					}
+					if ($vaf_filter_type eq 'all' || ($vaf_filter_type eq 'indel' && $type eq 'indel') || ($vaf_filter_type eq 'snv' && $type eq 'snv')) {
+						print STDERR "Skipping : low tumour VAF in $line\n";
+						next;
+					}
+				}
+				# Additional filtering for indels
+				# Keep if length of indel is less than 25 bp but not a complex indel with both alleles > 10, or ONP
+				# if not, keep if tum VAF > 0.25 and depth in T and N are both >= 20. Subtract 1 to length to account for anchor base
+				if ($indel_filter && ($strelka == 1 || $pindel == 1 || $gatk_hc == 1)) {
+					if (! (length($ref) - 1 <= 25 && length($alt) - 1 <= 25 && !(length($ref) - 1 > 10 && length($alt) - 1 > 10) && $type ne 'ONP')) {
+						if ($vaf > 0.25 && $dp_tum >= 20 && $dp_norm >= 20 && $type ne 'ONP') {
+							# do nothing
+						} else {
+							print STDERR "Skipping indel: $line\n";
+							next;
+						}
+					}
+				}
+
+				my @newlines;
+				my %genes_found;
+
+				# Parse each consequence in the CSQ section.
+				# Print one line per consequence (per gene, per allele)
+				my @csq = split /\,/, $csq;
+				foreach my $c (@csq) {
+					# split with -1 to include empty fields
+					my @cs = split(/\|/, $c, -1);
+
+					# Check choose the consequences that match the alt allele;
+					# This is used to get the consequences for multi-allelic sites
+					# (NB: mutect v1, pindel and strelka do not have multi-allelic sites
+					# so no consequences should be skipped. 
+					if ($cs[0] ne $alt_maf) {
+						print STDERR "Alt is $alt and found $cs[0]. Skipping $c\n";
+						next;
+					}
+					foreach my $i (0..$#cs) {
+						$cs[$i] = '-' if !$cs[$i];
+					}
+					# Parse out most severe conseq if multiple types, 
+					# flag if variant of interest, pass, check gnomAD or
+					# other vaf, check biotype, main consequence, canonical status
+					# in order to flag consequence lines to keep
+					my ($voi, $keep, $main_csq) = flag_voi(\@cs, $passfilt, \%csq_check_headers, $check_af);
+
+					# Get the maftools consequence term
+					if (! $so2maf{$main_csq}) {
+						die "Cannot find Maftools term for $main_csq\n";
+					}
+					my $class_maf = $so2maf{$main_csq};
+
+					# Fix frameshift mutation and protein-altering annotations
+					if ($class_maf eq 'Frame_Shift') {
+						if ($type eq 'INS') {
+							$class_maf .= "_Ins";
+						} elsif ($type eq 'DEL') {
+							$class_maf .= "_Del";
+						} else {
+							die "Found Frame_Shift but $type does not match $class_maf\n";
+						}
+					} elsif ($class_maf eq "protein_altering_variant") {
+						my $len_diff = length($ref) - length($alt);
+						$class_maf = $len_diff % 3 == 0 ? "In_Frame" : "Frame_Shift";
+						if ($type  eq 'DEL') {
+							$class_maf .= "_Del";
+						} else {
+							$class_maf .= "_Ins";
+						}
+					}
+
+					# Get the protein change from HGVSp
+					my $prot_change = get_protein_change($cs[$csq_check_headers{HGVSp}], $main_csq);
+					# Convert HEX "%3D" to "=" in case --no_escape was not used when running VEP
+					$cs[$csq_check_headers{HGVSp}] =~ s/%3D/=/;
+					# Get SYMBOL from CSQ section so it can be printed with maftools required columns
+					my $symbol = $cs[$csq_check_headers{Hugo_Symbol}];
+					# 
+					# Remove SYMBOL from @cs array before appending
+					# and remove unused columns
+					foreach my $remove ("Hugo_Symbol", "Existing_variation", "SOURCE") {
+						$cs[$csq_check_headers{$remove}] = "REMOVE" if $csq_check_headers{$remove};
+					}
+					@cs = grep {$_ ne 'REMOVE'} @cs; 
+					my @columns = (
+						$symbol,
+						'Sanger',
+						$build,
+						$chrom,
+						$pos_start,
+						$pos_end,
+						$class_maf,
+						$type,
+						$ref_maf,
+						$alt_maf,
+						$tumour,
+						$prot_change,
+						$pos,
+						$ids,
+						$qual,
+						$passfilt,
+						$tumour,
+						$normal,
+						$vaf,
+						$tum_counts,
+						$dp_tum,
+						$vaf_norm,
+						$norm_counts,
+						$dp_norm,
+						$voi,
+						$keep,
+						$main_csq,
+						$ref,
+						$alt,
+						@cs
+					);
+					# Print out line, depending on options
+					if ($voi_only) {
+						#print join("\t", @columns) . "\n" if $voi eq 'yes';
+						$genes_found{$symbol}++;
+						push @newlines, join("\t", @columns) . "\n" if $voi eq 'yes';
+					} elsif ($keepPA_only) {
+						#print join("\t", @columns) . "\n" if $keep =~ /keep/;
+						$genes_found{$symbol}++;
+						push @newlines, join("\t", @columns) . "\n" if $keep =~ /keep-PA/;
+					} elsif ($keep_only) {
+						#print join("\t", @columns) . "\n" if $keep =~ /keep/;
+						$genes_found{$symbol}++;
+						push @newlines, join("\t", @columns) . "\n" if $keep =~ /keep/;
+					} else {
+						$genes_found{$symbol}++;
+						push @newlines, join("\t", @columns) . "\n";
+					}
+				}
+				# Re-order variants affecting more than one gene, to prioritize
+				# when using maftools oncoplot
+		#		if (keys %genes_found > 1) {
+					@newlines = reorder_by_conseq(\@newlines, \@all_conseq, 28, 0);
+		#		}
+				print @newlines if @newlines;
 			}
 		}
-
-		my @newlines;
-		my %genes_found;
-
-		# Parse each consequence in the CSQ section.
-		# Print one line per consequence (per gene, per allele)
-		my @csq = split /\,/, $csq;
-		foreach my $c (@csq) {
-			my @cs = split(/\|/, $c, -1);
-			foreach my $i (0..$#cs) {
-				$cs[$i] = '-' if !$cs[$i];
-			}
-			# Parse out most severe conseq if multiple types, 
-			# flag if variant of interest, pass, check gnomAD or
-			# other vaf, check biotype, main consequence, canonical status
-			# in order to flag consequence lines to keep
-			my ($voi, $keep, $main_csq) = flag_voi(\@cs, $passfilt, \%csq_check_headers, $check_af);
-
-			# Get the maftools consequence term
-			if (! $so2maf{$main_csq}) {
-				die "Cannot find Maftools term for $main_csq\n";
-			}
-			my $class_maf = $so2maf{$main_csq};
-
-			# Fix frameshift mutation and protein-altering annotations
-			if ($class_maf eq 'Frame_Shift') {
-				if ($type eq 'INS') {
-					$class_maf .= "_Ins";
-				} elsif ($type eq 'DEL') {
-					$class_maf .= "_Del";
-				} else {
-					die "Found Frame_Shift but $type does not match $class_maf\n";
-				}
-			} elsif ($class_maf eq "protein_altering_variant") {
-				my $len_diff = length($ref) - length($alt);
-				$class_maf = $len_diff % 3 == 0 ? "In_Frame" : "Frame_Shift";
-				if ($type  eq 'DEL') {
-					$class_maf .= "_Del";
-				} else {
-					$class_maf .= "_Ins";
-				}
-			}
-
-			# Get the protein change from HGVSp
-			my $prot_change = get_protein_change($cs[$csq_check_headers{HGVSp}], $main_csq);
-			# Convert HEX "%3D" to "=" in case --no_escape was not used when running VEP
-			$cs[$csq_check_headers{HGVSp}] =~ s/%3D/=/;
-			# Get SYMBOL from CSQ section so it can be printed with maftools required columns
-			my $symbol = $cs[$csq_check_headers{Hugo_Symbol}];
-			# 
-			# Remove SYMBOL from @cs array before appending
-			# and remove unused columns
-			foreach my $remove ("Hugo_Symbol", "Existing_variation", "SOURCE") {
-				$cs[$csq_check_headers{$remove}] = "REMOVE";
-			}
-			@cs = grep {$_ ne 'REMOVE'} @cs; 
-			my @columns = (
-				$symbol,
-				'Sanger',
-				$build,
-				$chrom,
-				$pos_start,
-				$pos_end,
-				$class_maf,
-				$type,
-				$ref_maf,
-				$alt_maf,
-				$tumour,
-				$prot_change,
-				$pos,
-				$ids,
-				$qual,
-				$passfilt,
-				$tumour,
-				$normal,
-				$vaf,
-				$tum_counts,
-				$dp_tum,
-				$vaf_norm,
-				$norm_counts,
-				$dp_norm,
-				$voi,
-				$keep,
-				$main_csq,
-				$ref,
-				$alt,
-				@cs
-			);
-			# Print out line, depending on options
-			if ($voi_only) {
-				#print join("\t", @columns) . "\n" if $voi eq 'yes';
-				$genes_found{$symbol}++;
-				push @newlines, join("\t", @columns) . "\n" if $voi eq 'yes';
-			} elsif ($keepPA_only) {
-				#print join("\t", @columns) . "\n" if $keep =~ /keep/;
-				$genes_found{$symbol}++;
-#				print STDERR "keepPA $keep\n";
-				push @newlines, join("\t", @columns) . "\n" if $keep =~ /keep-PA/;
-			} elsif ($keep_only) {
-				#print join("\t", @columns) . "\n" if $keep =~ /keep/;
-				$genes_found{$symbol}++;
-#				print STDERR "keep $keep\n";
-				push @newlines, join("\t", @columns) . "\n" if $keep =~ /keep/;
-			} else {
-				#print join("\t", @columns) . "\n";
-				$genes_found{$symbol}++;
-				push @newlines, join("\t", @columns) . "\n";
-			}
-		}
-		# Re-order variants affecting more than one gene, to prioritize
-		# when using maftools oncoplot
-#		if (keys %genes_found > 1) {
-			@newlines = reorder_by_conseq(\@newlines, \@all_conseq, 28, 0);
-#		}
-		print @newlines if @newlines;
 	}
 	close F;
 }
 
 if ($sample_list) {
+	@sample_list = uniq @sample_list;
+	print SAM @sample_list;
 	close SAM;
 }
 
@@ -593,12 +700,6 @@ sub reorder_by_conseq {
 		my @cols = split(/\t/, $csq_line);
 		push @{$vars{$cols[$main_csq_idx]}{$cols[$gene_idx]}}, $csq_line;
 	}
-#	print STDERR "keys 1\n";
-#	print STDERR join("\n", sort keys %vars) . "\n";
-#	print STDERR "keys 2\n";
-#	foreach my $i (sort keys %vars) {
-#		print STDERR join(" ", sort keys %{$vars{$i}}) ."\n";
-#	}
 	# sort by main consequence then by gene
 	foreach my $cons (@$all_conseq) {
 		my @genes = sort keys %{$vars{$cons}};
@@ -703,6 +804,83 @@ sub mutect_stats {
 	return ($vaf, $vaf_norm, $tum_counts, $norm_counts, $tum_format->[$dp_index], $norm_format->[$dp_index]);
 }
 
+sub mutect2_stats_old {
+	my ($format, $tum_format, $norm_format) = @_;
+#	my $vaf_index = firstidx { $_ eq 'AF' } @$format; 
+	my $ad_index = firstidx { $_ eq 'AD' } @$format; 
+	my $dp_index = firstidx { $_ eq 'DP' } @$format; 
+	if (! defined($dp_index)) {
+		die "Can't find DP in " . join(':', @$format) . "\n";
+	}	
+#	if (! (defined($vaf_index) && defined($ad_index))) {
+	if (! defined($ad_index)) {
+		die "Can't find AD in " . join(':', @$format) . "\n";
+	}
+#	my $vaf = sprintf("%.3f", $tum_format->[$vaf_index]);
+#	my $vaf_norm = sprintf("%.3f", $norm_format->[$vaf_index]);
+	my $dp = $tum_format->[$dp_index];
+	my $dp_norm = $norm_format->[$dp_index];
+	my $tum_counts = join("\t", split(',', $tum_format->[$ad_index]));
+	my $norm_counts = join("\t", split(',', $norm_format->[$ad_index]));
+	my $vaf = sprintf("%.3f", $tum_counts / $dp);
+	my $vaf_norm = sprintf("%.3f", $norm_counts / $dp_norm);
+	if (! (defined($vaf) && defined($vaf_norm) && defined($tum_counts) && defined($norm_counts))) {
+		die join(' ', "Can't find tumour or normal allele counts and/or AFs in" , join(':', @$tum_format) , join(':', @$norm_format)) . "\n";
+	}
+
+	#return ($vaf, $vaf_norm, $tum_counts, $norm_counts, $tum_format->[$dp_index], $norm_format->[$dp_index]);
+	return ($vaf, $vaf_norm, $tum_counts, $norm_counts, $dp, $dp_norm);
+}
+
+sub mutect2_stats {
+	# GT:AD:DP:GQ:PL
+	#my ($format, $norm_format) = @_;
+	my ($format, $tum_format, $norm_format) = @_;
+#	my $vaf_index = firstidx { $_ eq 'FA' } @$format; 
+	my $ad_index = firstidx { $_ eq 'AD' } @$format; 
+	my $dp_index = firstidx { $_ eq 'DP' } @$format; 
+	my $gt_index = firstidx { $_ eq 'GT' } @$format; 
+	if (! defined($dp_index)) {
+		die "Can't find DP in " . join(':', @$format) . "\n";
+	}	
+	if (! (defined($ad_index))) {
+		die "Can't find AD in " . join(':', @$format) . "\n";
+	}
+	# GATK HC may have multiallelic sites
+	my @gt_tum = split(//, $tum_format->[$gt_index]);
+	my @gt_norm = split(//, $norm_format->[$gt_index]);
+	# Ignore GTs that are 1/2, 1/3, etc
+	if (($gt_tum[0] != $gt_tum[2]) && ($gt_tum[0] > 0 && $gt_tum[2] > 0)) {
+		return ("NA", "NA", "NA", "NA", "NA", "NA");
+	}
+	my @ad_tum = split(/,/, $tum_format->[$ad_index]);
+	my $ad_tum = $ad_tum[$gt_tum[2]]; # first allele is the ref allele
+	my @ad_norm = split(/,/, $norm_format->[$ad_index]);
+	my $ad_norm = $ad_norm[$gt_tum[2]]; # use the index from the tum to get the counts for the normal
+#	print STDERR join("\n", @ad_tum) . "\n";
+#	print STDERR "$ad_tum[$gt_tum[2]], $gt_tum[2], $ad_tum\n";
+#	print STDERR "$dp_index, $norm_format->[$dp_index]\n";
+#	print STDERR join(" ", @$norm_format) . "\n";
+	if ($norm_format->[$dp_index] == 0 || $tum_format->[$dp_index] == 0) {
+		# sometimes a GT is given but allele counts are 0
+		return (0, 0, 0, 0, 0, 0);
+	}
+	my $vaf_norm = sprintf("%.3f", $ad_norm / ($norm_format->[$dp_index]));
+	my $vaf_tum = sprintf("%.3f", $ad_tum / ($tum_format->[$dp_index]));
+	my @norm_counts = split(',', $norm_format->[$ad_index]);
+	my $norm_counts = join("\t", $norm_counts[$gt_norm[0]], $norm_counts[$gt_tum[2]]); # use the index from the tum to get the counts for the normal
+	my @tum_counts = split(',', $tum_format->[$ad_index]);
+	my $tum_counts = join("\t", $tum_counts[$gt_tum[0]], $tum_counts[$gt_tum[2]]);
+#	print STDERR "INDEX $ad_index $norm_format->[$ad_index]\n";
+#	print STDERR "NORM " . join(" ", @norm_counts) . "\n";
+#	print STDERR "TUM " . join(" ", @tum_counts) . "\n";
+	if ((! (defined($vaf_norm) && defined($norm_counts))) || (! (defined($vaf_tum) && defined($tum_counts)))) {
+		die join(' ', "Can't find tumour or normal allele counts and/or AFs in" , join(':', @$norm_format), join(':', @$tum_format)) . "\n";
+	}
+
+	#return ($vaf_norm, $norm_counts, $norm_format->[$dp_index]);
+	return ($vaf_tum, $vaf_norm, $tum_counts, $norm_counts, $tum_format->[$dp_index], $norm_format->[$dp_index]);
+}
 # VAF and allele counts from Strelka
 
 sub strelka_stats {
@@ -828,6 +1006,51 @@ sub pindel_stats {
 	my $norm_counts = join("\t", $norm_ref, $norm_format->[$FC_index]);
 
 	return ($vaf, $vaf_norm, $tum_counts, $norm_counts, $tum_format->[$FD_index], $norm_format->[$FD_index]);
+}
+
+
+sub gatkhc_stats {
+	# GT:AD:DP:GQ:PL
+	my ($format, $norm_format, $alt_num) = @_;
+	$alt_num++;
+#	my $vaf_index = firstidx { $_ eq 'FA' } @$format; 
+	my $ad_index = firstidx { $_ eq 'AD' } @$format; 
+	my $dp_index = firstidx { $_ eq 'DP' } @$format; 
+	my $gt_index = firstidx { $_ eq 'GT' } @$format; 
+	if (! defined($dp_index)) {
+		die "Can't find DP in " . join(':', @$format) . "\n";
+	}	
+	if (! (defined($ad_index))) {
+		die "Can't find AD in " . join(':', @$format) . "\n";
+	}
+	# GATK HC may have multiallelic sites
+	my @gt = split(//, $norm_format->[$gt_index]);
+	# Check to see if the alt allele indexes are the same
+	if ($alt_num != $gt[2]) {
+		return ("NA", "NA", "NA");
+	}
+	# Ignore GTs that are 1/2, 1/3, etc
+	if (($gt[0] != $gt[2]) && ($gt[0] > 0 && $gt[2] > 0)) {
+		return ("NA", "NA", "NA");
+	}
+	my @ad = split(/,/, $norm_format->[$ad_index]);
+	my $ad = $ad[$gt[2]]; # first allele is the ref allele
+#	print STDERR join("\n", @ad) . "\n";
+#	print STDERR "$ad[$gt[2]], $gt[2], $ad\n";
+#	print STDERR "$dp_index, $norm_format->[$dp_index]\n";
+#	print STDERR join(" ", @$norm_format) . "\n";
+	if ($ad == 0 || $norm_format->[$dp_index] == 0) {
+		# sometimes a GT is given but allele counts are 0
+		return (0, 0, 0);
+	}
+	my $vaf_norm = sprintf("%.3f", $ad / ($norm_format->[$dp_index]));
+	my @norm_counts = split(',', $norm_format->[$ad_index]);
+	my $norm_counts = join("\t", $norm_counts[$gt[0]], $norm_counts[$gt[2]]);
+	if (! (defined($vaf_norm) && defined($norm_counts))) {
+		die join(' ', "Can't find tumour or normal allele counts and/or AFs in" , join(':', @$norm_format)) . "\n";
+	}
+
+	return ($vaf_norm, $norm_counts, $norm_format->[$dp_index]);
 }
 
 # Order of Ensembl conseqeuences as of VEP v105

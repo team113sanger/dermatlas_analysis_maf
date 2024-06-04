@@ -18,10 +18,6 @@ elif [[ ! -e $PROJECTDIR/scripts/MAF/maf2xlsx.R ]]; then
     exit 1
 fi
 
-export SINGULARITY_BINDPATH='/lustre,/software'
-RSCRIPT=/software/team113/dermatlas/R/R-4.2.2/bin/Rscript
-export R_LIBS=/software/team113/dermatlas/R/R-4.2.2/lib/R/library/
-
 
 ##### Process one tumour per patient #####
 
@@ -50,7 +46,7 @@ for cohort in all independent onePerPatient; do
         
             rsync -a --exclude '*maf' --exclude 'Rplots.pdf' $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/plots_keepPA_vaf_size_filt_matched/* $RELEASE/$REL_DIR/matched_samples/QC_keepPA/
         
-        $RSCRIPT $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/matched_samples/$STUDY-filtered_mutations_matched_${NAME}_keepPA.maf
+        Rscript $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/matched_samples/$STUDY-filtered_mutations_matched_${NAME}_keepPA.maf
         
         cp -v $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/sample_list_matched.tsv $RELEASE/$REL_DIR/matched_samples/
         
@@ -61,7 +57,7 @@ for cohort in all independent onePerPatient; do
         
         rsync -a --exclude '*maf' --exclude 'Rplots.pdf' --exclude mutations_per_Mb.tsv $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/plots_keep_vaf_size_filt_matched/* $RELEASE/$REL_DIR/matched_samples/QC_keep/
         
-        $RSCRIPT $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/matched_samples/$STUDY-filtered_mutations_matched_${NAME}_keep.maf
+        Rscript $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/matched_samples/$STUDY-filtered_mutations_matched_${NAME}_keep.maf
         
         cp -v $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/sample_list_matched.tsv $RELEASE/$REL_DIR/matched_samples/
         
@@ -71,7 +67,7 @@ for cohort in all independent onePerPatient; do
          
         rsync -a --exclude '*maf' --exclude 'Rplots.pdf' $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/plots_keepPA_vaf_size_filt/* $RELEASE/$REL_DIR/all_samples/QC_keepPA
         
-        $RSCRIPT $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/all_samples/$STUDY-filtered_mutations_all_${NAME}_keepPA.maf
+        Rscript $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/all_samples/$STUDY-filtered_mutations_all_${NAME}_keepPA.maf
         
         cp -v $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/sample_list.tsv $RELEASE/$REL_DIR/all_samples/
          
@@ -82,7 +78,7 @@ for cohort in all independent onePerPatient; do
         
         rsync -a --exclude '*maf' --exclude 'Rplots.pdf' --exclude mutations_per_Mb.tsv $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/plots_keep_vaf_size_filt/* $RELEASE/$REL_DIR/all_samples/QC_keep/
         
-        $RSCRIPT $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/all_samples/$STUDY-filtered_mutations_all_${NAME}_keep.maf
+        Rscript $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/all_samples/$STUDY-filtered_mutations_all_${NAME}_keep.maf
         
         cp -v $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/sample_list.tsv $RELEASE/$REL_DIR/all_samples/
     fi

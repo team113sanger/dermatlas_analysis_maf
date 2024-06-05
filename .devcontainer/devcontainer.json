@@ -1,0 +1,20 @@
+{
+    "name": "Existing Docker Compose (Extend)",
+    "dockerComposeFile": [
+		"../docker-compose.yml"
+	],
+    "service": "maf",
+    "workspaceFolder": "/opt/repo",
+    "remoteUser": "admin",
+    "customizations": {
+		"vscode": {
+			"extensions": [
+				"eamodio.gitlens",
+				"ms-azuretools.vscode-docker"
+			],
+			"settings": {
+			}
+		}
+
+}
+}

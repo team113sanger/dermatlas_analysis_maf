@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unmerged
 - Create docker boilerplate 
 - Caputured R dependencies
-
+- PERL installation TODO 
 
 ## [0.4.0] Publishable Unit 4
 ### Added

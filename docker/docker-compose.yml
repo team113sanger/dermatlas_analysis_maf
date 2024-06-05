@@ -1,5 +1,5 @@
 services:
-  example:
+  maf:
     container_name: maf
     user: admin
     image: maf:local

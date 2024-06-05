@@ -66,6 +66,7 @@ RUN \
     apt-transport-https \
     curl \
     tree \
+    cpanminus \
     procps \
     ca-certificates \
     libtasn1-dev \
@@ -88,7 +89,19 @@ RUN \
     libudunits2-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Download and install Perl 5.38.0 from source
+RUN wget https://www.cpan.org/src/5.0/perl-5.38.0.tar.gz && \
+    tar -xzf perl-5.38.0.tar.gz && \
+    cd perl-5.38.0 && \
+    ./Configure -des -Dprefix=/usr/local && \
+    make && \
+    make install && \
+    cd .. && \
+    rm -rf perl-5.38.0 perl-5.38.0.tar.gz
 
+RUN cpanm List::MoreUtils List::Util File::Basename Getopt::Long
+
+ENV PATH=/usr/local/bin:$PATH
 
 # Create and CD to the directory where the R packages will be installed
 WORKDIR $PROJECT_DIRECTORY
@@ -97,7 +110,6 @@ WORKDIR $PROJECT_DIRECTORY
 # The presence of the renv.lock is optional, to achieve idempotency
 COPY --chown="${USER_NAME}:${USER_NAME}" [".gitignore", ".Rprofile", "renv.loc[k]", "dependencies.R", "setup_dependencies.R", "./"]
 COPY --chown="${USER_NAME}:${USER_NAME}" ["renv/activate.R", "renv/settings.json", "./renv/"]
-
 
 RUN Rscript setup_dependencies.R --force
 
@@ -110,19 +122,19 @@ ENV R_LIBS="/opt/renv/library/R-4.2/x86_64-pc-linux-gnu"
 # Copy the rest of the files into the image (except the .Dockerignore files)
 COPY --chown="${USER_NAME}:${USER_NAME}" . .
 
-# Reapply permissions after all installation and copying is done so the user can
-# manipulate the files if necessary
+# # Reapply permissions after all installation and copying is done so the user can
+# # manipulate the files if necessary
 RUN \
     chown -R "${USER_NAME:?}:${USER_NAME:?}" "${PROJECT_DIRECTORY:?}" "${DATA_DIRECTORY:?}" "${USER_DIRECTORY:?}" "${OPT_DIRECTORY:?}" \
     && chmod -R 755 "${PROJECT_DIRECTORY:?}" "${DATA_DIRECTORY:?}" "${USER_DIRECTORY:?}" "${OPT_DIRECTORY:?}"
 
-# Switch to the non-root user
+# # Switch to the non-root user
 USER "${USER_NAME:?}"
 
 
-# Build time test to confirm that the package is installed
-# TODO - remove this once CI has a better way to test. We want to check R finds
-# these packages when outside of the repo (the repo is bootstrapped by .Rprofile)
+# # Build time test to confirm that the package is installed
+# # TODO - remove this once CI has a better way to test. We want to check R finds
+# # these packages when outside of the repo (the repo is bootstrapped by .Rprofile)
 WORKDIR /
 RUN R --version && \
     R --slave -e 'packageVersion("dplyr")'

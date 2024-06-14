@@ -89,19 +89,22 @@ RUN \
     libudunits2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and install Perl 5.38.0 from source
-RUN wget https://www.cpan.org/src/5.0/perl-5.38.0.tar.gz && \
-    tar -xzf perl-5.38.0.tar.gz && \
-    cd perl-5.38.0 && \
-    ./Configure -des -Dprefix=/usr/local && \
-    make && \
-    make install && \
-    cd .. && \
-    rm -rf perl-5.38.0 perl-5.38.0.tar.gz
-
-RUN cpanm List::MoreUtils List::Util File::Basename Getopt::Long
-
 ENV PATH=/usr/local/bin:$PATH
+#######################################
+# Install perl v5.38 - required modules
+#######################################
+# apt-get required libraries like perl, curl and build-essential were added to the code above
+# Install cpanminus (cpanm)
+RUN curl -L https://cpanmin.us | perl - App::cpanminus
+
+# Install required Perl modules using cpanm
+RUN cpanm strict List::MoreUtils List::Util File::Basename Getopt::Long
+
+
+# Verify installations
+RUN perl -Mstrict -e 'print "strict module is available\n"' && \
+    perl -List::MoreUtils -e 'print "List::MoreUtils module is available\n"' && \
+    cpanm --version
 
 # Create and CD to the directory where the R packages will be installed
 WORKDIR $PROJECT_DIRECTORY

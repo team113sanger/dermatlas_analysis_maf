@@ -87,6 +87,7 @@ RUN \
     libxml2-dev \
     libncurses-dev \
     libudunits2-dev \
+    bc \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PATH=/usr/local/bin:$PATH

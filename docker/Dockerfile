@@ -103,7 +103,7 @@ RUN cpanm strict List::MoreUtils List::Util File::Basename Getopt::Long
 
 # Verify installations
 RUN perl -Mstrict -e 'print "strict module is available\n"' && \
-    perl -List::MoreUtils -e 'print "List::MoreUtils module is available\n"' && \
+    perl -MList::MoreUtils -e 'print "List::MoreUtils module is available\n"' && \
     cpanm --version
 
 # Create and CD to the directory where the R packages will be installed

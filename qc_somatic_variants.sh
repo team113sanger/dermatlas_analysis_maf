@@ -45,10 +45,10 @@ shift $((OPTIND -1))
 
 # Check input parameters
 
-if [[ -z "$SCRIPTDIR" || -z "$vcflist" ]]; then
-	usage
-	exit 1
-fi
+# if [[ -z "$SCRIPTDIR" || -z "$vcflist" ]]; then
+# 	usage
+# 	exit 1
+# fi
 
 if [[ ! -z "$which" && ! ($which == "filter1" || $which == "filter2") ]]; then
 	echo "The filter option -f should be 'filter1' to indicate filtering by VAF >= 0.1 or 'filter2' to filter by 'ONP', VAF and REF and ALT lengths (indels)"
@@ -58,40 +58,40 @@ fi
 
 # Check that directories and files exist
 
-echo "Checking script directory and input files"
+# echo "Checking script directory and input files"
 
-SCRIPTDIR=$SCRIPTDIR/MAF
+# SCRIPTDIR=$SCRIPTDIR/MAF
 
-if [[ ! -d $SCRIPTDIR ]]; then
-	echo "Directory $SCRIPTDIR does not exist"
-	exit 1
-elif [[ ! -e $SCRIPTDIR/reformat_vcf2maf.pl ]]; then
-	echo "File $SCRIPTDIR/reformat_vcf2maf.pl does not exist"
-	exit 1
-elif [[ ! -e $SCRIPTDIR/plot_vaf_vs_depth_from_maf.R ]]; then
-	echo "File $SCRIPTDIR/plot_vaf_vs_depth_from_maf.R does not exist"
-	exit 1
-elif [[ ! -e $SCRIPTDIR/maketileplot_from_maf.R ]]; then
-	echo "$SCRIPTDIR/maketileplot_from_maf.R does not exist"
-	exit 1
-elif [[ ! -e $vcflist ]]; then 
-	echo "File $vcflist does not exist"
-	exit 1
-fi
+# if [[ ! -d $SCRIPTDIR ]]; then
+# 	echo "Directory $SCRIPTDIR does not exist"
+# 	exit 1
+# elif [[ ! -e $SCRIPTDIR/reformat_vcf2maf.pl ]]; then
+# 	echo "File $SCRIPTDIR/reformat_vcf2maf.pl does not exist"
+# 	exit 1
+# elif [[ ! -e $SCRIPTDIR/plot_vaf_vs_depth_from_maf.R ]]; then
+# 	echo "File $SCRIPTDIR/plot_vaf_vs_depth_from_maf.R does not exist"
+# 	exit 1
+# elif [[ ! -e $SCRIPTDIR/maketileplot_from_maf.R ]]; then
+# 	echo "$SCRIPTDIR/maketileplot_from_maf.R does not exist"
+# 	exit 1
+# elif [[ ! -e $vcflist ]]; then 
+# 	echo "File $vcflist does not exist"
+# 	exit 1
+# fi
 
-echo "Output directory is current directory: $PWD"
+# echo "Output directory is current directory: $PWD"
 if [[ ! -z "$skip_maf" ]]; then
 	echo "Skipping vcf2maf; making plots only"
 fi
 
 # Check that each VCF exists
 
-for vcf in `cat $vcflist`; do
-	if [[ ! -e $vcf ]]; then
-		echo "NOT FOUND: $vcf"	
-		exit 1
-	fi
-done
+# for vcf in `cat $vcflist`; do
+# 	if [[ ! -e $vcf ]]; then
+# 		echo "NOT FOUND: $vcf"	
+# 		exit 1
+# 	fi
+# done
 
 
 # Reformat VCFs to MAF

@@ -64,6 +64,7 @@ RUN \
     && apt-get install -yq --no-install-recommends \
     build-essential \
     apt-transport-https \
+    ttf-ubuntu-font-family \
     curl \
     tree \
     cpanminus \

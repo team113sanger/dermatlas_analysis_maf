@@ -9,7 +9,7 @@
 # IMPORTANT
 # If you change the base image, you will need to update the
 # PRE_FETCH_BASE_IMAGE variable in the .gitlab-ci.yml file also.
-FROM rocker/r-base:4.2.2 as builder
+FROM rocker/r-ver:4.2.2 as builder
 
 # Be the root user, explictly
 USER root

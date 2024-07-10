@@ -1,11 +1,11 @@
 {
     "name": "Existing Docker Compose (Extend)",
     "dockerComposeFile": [
-		"../docker-compose.yml"
+		"../docker/docker-compose.yml"
 	],
     "service": "maf",
     "workspaceFolder": "/opt/repo",
-    "remoteUser": "admin",
+    "remoteUser": "root",
     "customizations": {
 		"vscode": {
 			"extensions": [

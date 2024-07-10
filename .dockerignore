@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 
+
 # Distribution / packaging
 .Python
 build/
@@ -87,3 +88,4 @@ precommit_cache/
 
 # Keep docker/build
 !docker/build
+renv

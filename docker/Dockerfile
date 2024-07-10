@@ -9,7 +9,7 @@
 # IMPORTANT
 # If you change the base image, you will need to update the
 # PRE_FETCH_BASE_IMAGE variable in the .gitlab-ci.yml file also.
-FROM rocker/r-ver:4.2.2 as builder
+FROM rocker/tidyverse:4.2.2 as builder
 
 # Be the root user, explictly
 USER root
@@ -52,7 +52,7 @@ RUN \
     locale-gen "${LANG:?}" \
     && update-locale LANG="${LANG:?}" \
     && useradd "${USER_NAME}" --shell /bin/bash --create-home --home-dir "${USER_DIRECTORY}" \
-    && usermod -a -G docker,staff admin \
+    && usermod -a -G staff admin \
     && mkdir -p "${PROJECT_DIRECTORY:?}" "${DATA_DIRECTORY:?}" "${OPT_DIRECTORY:?}" "${RENV_DIRECTORY:?}" "${RENV_PATHS_LIBRARY:?}" "${RENV_PATHS_CACHE:?}" "${OTHER_INSTALLS_LIB:?}" "${OTHER_INSTALLS_BIN:?}" \
     && chown -R "${USER_NAME:?}:${USER_NAME:?}" "${PROJECT_DIRECTORY:?}" "${DATA_DIRECTORY:?}" "${USER_DIRECTORY:?}" "${OPT_DIRECTORY:?}" \
     && chmod -R 755 "${PROJECT_DIRECTORY:?}" "${DATA_DIRECTORY:?}" "${USER_DIRECTORY:?}" "${OPT_DIRECTORY:?}" 
@@ -64,7 +64,6 @@ RUN \
     && apt-get install -yq --no-install-recommends \
     build-essential \
     apt-transport-https \
-    ttf-ubuntu-font-family \
     curl \
     tree \
     cpanminus \
@@ -72,26 +71,11 @@ RUN \
     ca-certificates \
     libtasn1-dev \
     nettle-dev \
-    libgmp-dev \
-    libp11-kit-dev \
-    zlib1g-dev \
-    libbz2-dev \
-    liblzma-dev \
-    libcurl4-openssl-dev \
-    libssl-dev \
-    libfontconfig1-dev \
-    libharfbuzz-dev \
-    libfribidi-dev \
-    libfreetype6-dev \
-    libpng-dev \
-    libtiff5-dev \
-    libxml2-dev \
-    libncurses-dev \
-    libudunits2-dev \
     bc \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PATH=/usr/local/bin:$PATH
+
 #######################################
 # Install perl v5.38 - required modules
 #######################################
@@ -113,10 +97,11 @@ WORKDIR $PROJECT_DIRECTORY
 
 # Copy the R scripts that install the R packages and that parameterize the renv
 # The presence of the renv.lock is optional, to achieve idempotency
-COPY --chown="${USER_NAME}:${USER_NAME}" [".gitignore", ".Rprofile", "renv.loc[k]", "dependencies.R", "setup_dependencies.R", "./"]
-COPY --chown="${USER_NAME}:${USER_NAME}" ["renv/activate.R", "renv/settings.json", "./renv/"]
+COPY --chown="${USER_NAME}:${USER_NAME}" ["./.gitignore", "./renv.loc[k]", "./"]
+# COPY --chown="${USER_NAME}:${USER_NAME}" ["renv/activate.R", "renv/settings.json", "./renv/"]
 
-RUN Rscript setup_dependencies.R --force
+RUN R --slave -e "install.packages('renv')"
+RUN R --slave -e "renv::init(settings = list(external.libraries = '/usr/local/lib/R/site-library'))"
 
 # We set the R_LIBS environment variable to the renv library path so that the
 # Rscript command will use the renv library path by default (regardless of the

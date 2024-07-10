@@ -15,12 +15,6 @@ services:
         # ../ here means relative to the docker-compose.yml file.
         source: ../
         target: /opt/repo/
-      # - type: volume
-      #   source: example-renv-cache
-      #   target: /opt/renv-cache
-      # - type: bind
-      #   source: /lustre/scratch124/<username>
-      #   target: /lustre/scratch124/<username>
     networks:
       - local-default
 

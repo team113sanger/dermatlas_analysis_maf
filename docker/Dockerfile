@@ -100,14 +100,16 @@ WORKDIR $PROJECT_DIRECTORY
 # COPY --chown="${USER_NAME}:${USER_NAME}" [".gitignore", "renv.loc[k]", "./"]
 # COPY --chown="${USER_NAME}:${USER_NAME}" ["renv/activate.R", "renv/settings.json", "./renv/"]
 
+ENV SYSTEM_LIBS="/usr/local/lib/R/site-library"
 RUN R --slave -e "install.packages('renv')"
-RUN R --slave -e "renv::init(settings = list(external.libraries = '/usr/local/lib/R/site-library'))"
+RUN R --slave -e "renv::init(settings = list(external.libraries = '${SYSTEM_LIBS}'))"
 
 # We set the R_LIBS environment variable to the renv library path so that the
 # Rscript command will use the renv library path by default (regardless of the
 # directory we are in)
-ENV R_LIBS="/opt/renv/library/R-4.2/x86_64-pc-linux-gnu"
 RUN R --slave -e "renv::restore()"
+# RUN Rscript setup_dependencies.R --force
+ENV R_LIBS="/opt/renv/library/R-4.2/x86_64-pc-linux-gnu:${SYSTEM_LIBS:?}:/opt/repo/renv/sandbox/R-4.2/x86_64-pc-linux-gnu/25ebdc09"
 
 
 # Copy the rest of the files into the image (except the .Dockerignore files)
@@ -121,17 +123,15 @@ RUN \
 
 # # Switch to the non-root user
 USER "${USER_NAME:?}"
-
+RUN R --slave -e "renv::restore()"
 
 # # Build time test to confirm that the package is installed
 # # TODO - remove this once CI has a better way to test. We want to check R finds
 # # these packages when outside of the repo (the repo is bootstrapped by .Rprofile)
 WORKDIR /
 RUN R --version && \
-    R --slave -e 'packageVersion("vroom")'  && \
-    R --slave -e 'packageVersion("reshape2")'
-
-
+    R --slave -e "packageVersion('vroom')"
+    # R --slave -e "packageVersion('cowplot')"
 # Explicitly set the working directory (again) and the command to run when the
 # container is started
 WORKDIR $PROJECT_DIRECTORY

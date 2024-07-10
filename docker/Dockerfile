@@ -107,6 +107,7 @@ RUN R --slave -e "renv::init(settings = list(external.libraries = '/usr/local/li
 # Rscript command will use the renv library path by default (regardless of the
 # directory we are in)
 ENV R_LIBS="/opt/renv/library/R-4.2/x86_64-pc-linux-gnu"
+RUN R --slave -e "renv::restore()"
 
 
 # Copy the rest of the files into the image (except the .Dockerignore files)
@@ -127,7 +128,7 @@ USER "${USER_NAME:?}"
 # # these packages when outside of the repo (the repo is bootstrapped by .Rprofile)
 WORKDIR /
 RUN R --version && \
-    R --slave -e 'packageVersion("vroom")' && \
+    R --slave -e 'packageVersion("vroom")'  && \
     R --slave -e 'packageVersion("reshape2")'
 
 

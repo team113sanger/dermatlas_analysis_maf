@@ -127,8 +127,10 @@ USER "${USER_NAME:?}"
 # # these packages when outside of the repo (the repo is bootstrapped by .Rprofile)
 WORKDIR /
 RUN R --version && \
+    R --slave -e 'packageVersion("vroom")'
     R --slave -e 'packageVersion("vroom")' && \
     R --slave -e 'packageVersion("reshape2")'
+
 
 # Explicitly set the working directory (again) and the command to run when the
 # container is started

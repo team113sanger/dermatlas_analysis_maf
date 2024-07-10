@@ -97,7 +97,7 @@ WORKDIR $PROJECT_DIRECTORY
 
 # Copy the R scripts that install the R packages and that parameterize the renv
 # The presence of the renv.lock is optional, to achieve idempotency
-COPY --chown="${USER_NAME}:${USER_NAME}" ["./.gitignore", "./renv.loc[k]", "./"]
+# COPY --chown="${USER_NAME}:${USER_NAME}" [".gitignore", "renv.loc[k]", "./"]
 # COPY --chown="${USER_NAME}:${USER_NAME}" ["renv/activate.R", "renv/settings.json", "./renv/"]
 
 RUN R --slave -e "install.packages('renv')"
@@ -127,7 +127,8 @@ USER "${USER_NAME:?}"
 # # these packages when outside of the repo (the repo is bootstrapped by .Rprofile)
 WORKDIR /
 RUN R --version && \
-    R --slave -e 'packageVersion("vroom")'
+    R --slave -e 'packageVersion("vroom")' && \
+    R --slave -e 'packageVersion("reshape2")'
 
 # Explicitly set the working directory (again) and the command to run when the
 # container is started

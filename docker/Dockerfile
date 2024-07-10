@@ -127,7 +127,6 @@ USER "${USER_NAME:?}"
 # # these packages when outside of the repo (the repo is bootstrapped by .Rprofile)
 WORKDIR /
 RUN R --version && \
-    R --slave -e 'packageVersion("vroom")'
     R --slave -e 'packageVersion("vroom")' && \
     R --slave -e 'packageVersion("reshape2")'
 

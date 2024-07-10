@@ -1,3 +1,4 @@
+source("renv/activate.R")
 suppressMessages(library(ggplot2))
 suppressMessages(library(reshape2))
 suppressMessages(library(plyr))

@@ -6,7 +6,7 @@ stages:
 include:
 # DOCS: https://gitlab.internal.sanger.ac.uk/DERMATLAS/common/cicd-template/-/blob/develop/README.md
   - project: 'team113sanger/common/cicd-template'
-    ref: 0.1.11
+    ref: 0.3.1
     file: '.gitlab-ci-components.yml'
 
 #############

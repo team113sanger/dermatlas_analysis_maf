@@ -397,7 +397,7 @@ write_pdf <- function(plotlist, prefix = "gene_table", width = 5, height = 5, re
 				plot <- plot_grid(plotlist = plotlist, ncol = 2, rel_widths = c(relsizeA,relsizeB), align = "h", axis = "bt", labels = c('A', 'B'))
 			}
 		}
-		save_plot(filename = paste(prefix,".pdf", sep = ''), plot,  base_width = width, base_height = height)
+		save_plot(filename = paste(prefix,".pdf", sep = ''), plot,  base_width = width, base_height = height, device = "cairo_pdf")
 	}
 }
 

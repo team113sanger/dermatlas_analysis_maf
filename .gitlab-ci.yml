@@ -25,10 +25,7 @@ include:
     USE_DOCKER_TARGET_STAGE: 0
     # We need to set this to 1 to enable BuildKit as the Dockerfile uses BuildKit features to speed up the build
     DOCKER_BUILDKIT: 1
-    PRE_FETCH_BASE_IMAGE: rocker/r-base:4.2.2
-    # The directory where the Dockerfile is located
-    DOCKER_BUILD_CONTEXT: .
-    DOCKERFILE_PATH: docker/Dockerfile
+    PRE_FETCH_BASE_IMAGE: rocker/tidyverse:4.2.2
 
 ############
 #   JOBS   #

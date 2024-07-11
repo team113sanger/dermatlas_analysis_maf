@@ -5,15 +5,15 @@ services:
     image: maf:local
     build:
       # ../ here means relative to the docker-compose.yml file.
-      context: ../
-      dockerfile: docker/Dockerfile
+      context: ./
+      dockerfile: Dockerfile
     restart: unless-stopped
     # You want the container to stay up forever while you're developing.
     command: sleep infinity
     volumes:
       - type: bind
         # ../ here means relative to the docker-compose.yml file.
-        source: ../
+        source: ./
         target: /opt/repo/
     networks:
       - local-default

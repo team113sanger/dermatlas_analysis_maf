@@ -379,7 +379,7 @@ write_pdf <- function(plotlist, prefix = "gene_table", width = 5, height = 5, re
 	if (length(plotlist) == 1) {
 		print("Plotting 1 plot")
 		plot <- plot_grid(plotlist = plotlist)
-		save_plot(filename = paste(prefix,".pdf", sep = ''), plot,  base_width = width, base_height = height)
+		save_plot(filename = paste(prefix,".pdf", sep = ''), plot,  base_width = width, base_height = height, device = "cairo_pdf")
 	} else	{
 		print("Plotting 2 plots")
 		if (direction == 'vertical') {

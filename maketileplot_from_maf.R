@@ -11,9 +11,9 @@ suppressMessages(library(optparse))
 
 suppressMessages(extrafont::loadfonts())
 
-#showtext_auto(TRUE)
-#font_paths()
-#font_add("Arial", "Arial.ttf")
+# showtext_auto(TRUE)
+# font_paths()
+# font_add("Arial", "Arial.ttf")
 ##font_add("Arial_Bold", "Arial_Bold.ttf")
 #font_add("Arial_Italic", "Arial_Italic.ttf")
 sessionInfo()
@@ -379,7 +379,7 @@ write_pdf <- function(plotlist, prefix = "gene_table", width = 5, height = 5, re
 	if (length(plotlist) == 1) {
 		print("Plotting 1 plot")
 		plot <- plot_grid(plotlist = plotlist)
-		save_plot(filename = paste(prefix,".pdf", sep = ''), plot,  base_width = width, base_height = height, device = "cairo_pdf")
+		save_plot(filename = paste(prefix,".pdf", sep = ''), plot,  base_width = width, base_height = height)
 	} else	{
 		print("Plotting 2 plots")
 		if (direction == 'vertical') {
@@ -397,7 +397,7 @@ write_pdf <- function(plotlist, prefix = "gene_table", width = 5, height = 5, re
 				plot <- plot_grid(plotlist = plotlist, ncol = 2, rel_widths = c(relsizeA,relsizeB), align = "h", axis = "bt", labels = c('A', 'B'))
 			}
 		}
-		save_plot(filename = paste(prefix,".pdf", sep = ''), plot,  base_width = width, base_height = height, device = "cairo_pdf")
+		save_plot(filename = paste(prefix,".pdf", sep = ''), plot,  base_width = width, base_height = height)
 	}
 }
 

@@ -69,6 +69,7 @@ RUN \
     ca-certificates \
     libtasn1-dev \
     nettle-dev \
+    libcairo2-dev \
     bc \
     && rm -rf /var/lib/apt/lists/*
 
@@ -100,6 +101,10 @@ COPY --chown="${USER_NAME}:${USER_NAME}" [".gitignore", "renv.loc[k]", "./"]
 
 ENV SYSTEM_LIBS="/usr/local/lib/R/site-library"
 RUN R --slave -e "install.packages('renv')"
+RUN R --slave -e "install.packages('Cairo')"
+# RUN R -e "sysfonts::font_add('Arial', 'Arial.ttf')"
+# RUN R -e "sysfonts::font_add('Arial_Bold', 'Arial_Bold.ttf')"
+# RUN R -e "sysfonts::font_add('Arial_Italic', 'Arial_Italic.ttf')"
 RUN R --slave -e "renv::init(settings = list(external.libraries = '${SYSTEM_LIBS}'))"
 
 # We set the R_LIBS environment variable to the renv library path so that the
@@ -108,6 +113,7 @@ RUN R --slave -e "renv::init(settings = list(external.libraries = '${SYSTEM_LIBS
 RUN R -e "renv::restore(prompt= FALSE)"
 # RUN Rscript setup_dependencies.R --force
 ENV R_LIBS="/opt/renv/library/R-4.2/x86_64-pc-linux-gnu:${SYSTEM_LIBS:?}:/opt/renv-cache/v5/R-4.2/x86_64-pc-linux-gnu"
+
 
 
 # Copy the rest of the files into the image (except the .Dockerignore files)

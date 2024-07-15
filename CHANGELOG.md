@@ -12,7 +12,7 @@ Resolve naming discrepancy between `somatic_variants_qc.sh` in QC repo and in ne
 - Created elements for Dockerising analysis (tidyverse base image)
 - Caputured R dependencies
 - Added PERL 3.8.0 to project dockerfile
-- Moved `qc_somatic_variants.sh` script into this analysis method to sit with the scripts it calls.
+- Moved `somatic_variants_qc.sh` script into this analysis method to sit with the scripts it calls.
 ### Changed 
 - Modified the font used in `maketileplot_from_maf.R` to use sans rather than Arial - avoid liscencing issues and having to install Arial fonts into the container for the time being. 
 

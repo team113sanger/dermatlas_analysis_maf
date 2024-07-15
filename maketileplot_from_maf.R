@@ -11,9 +11,9 @@ suppressMessages(library(optparse))
 
 suppressMessages(extrafont::loadfonts())
 
-#showtext_auto(TRUE)
-#font_paths()
-#font_add("Arial", "Arial.ttf")
+# showtext_auto(TRUE)
+# font_paths()
+# font_add("Arial", "Arial.ttf")
 ##font_add("Arial_Bold", "Arial_Bold.ttf")
 #font_add("Arial_Italic", "Arial_Italic.ttf")
 sessionInfo()
@@ -549,14 +549,13 @@ make_mutation_plot <- function(data, legendpos = "top", nrow = 2, ncol = 5, vlin
 			panel.background = element_rect(fill="grey90"),
 			panel.grid.major = element_blank(),
 			panel.grid.minor = element_blank(),
-			#axis.text.x = element_text(size = sizex, family = "Arial", color = "black", angle = 90, hjust=1, vjust=0.5),
 			axis.text.x = element_text(size = sizex, family = "mono", color = "black", angle = 90, hjust=1, vjust=0.5),
-			axis.text.y = element_text(size = sizey, family = "Arial", face = "italic", color = "black"),
+			axis.text.y = element_text(size = sizey, family = "sans", face = "plain", color = "black"),
 			legend.position = legendpos,
 			legend.margin = margin(b = 0, unit = "cm"),
 			# below: box around legend
 			legend.background = element_blank(),	
-			legend.key.size = unit(0.25, "cm"),legend.title = element_text(family = "Arial", size = 9, face = "bold"),legend.text = element_text(size = 9) 
+			legend.key.size = unit(0.25, "cm"),legend.title = element_text(family = "sans", size = 9, face = "bold"),legend.text = element_text(size = 9) 
 		) +
 		scale_y_discrete(expand = c(0, 0), limits = gene.index) +
 ##			#scale_y_discrete(breaks = c(1:breaks.y), expand = c(0, 0), labels = labels.y, limits = c(1:breaks.y)) +

@@ -3,6 +3,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+### TODO 
+Resolve naming discrepancy between `somatic_variants_qc.sh` in QC repo and in nextflow pipeline which calls this repo `qc_somatic_variants.sh`
+
+## [0.5.0] Dockerisation/Pipelining
+### Added 
+- Created elements for Dockerising analysis (tidyverse base image)
+- Caputured R dependencies
+- Added PERL 3.8.0 to project dockerfile
+- Moved `somatic_variants_qc.sh` script into this analysis method to sit with the scripts it calls.
+### Changed 
+- Modified the font used in `maketileplot_from_maf.R` to use sans rather than Arial - avoid liscencing issues and having to install Arial fonts into the container for the time being. 
+
+
 ## [0.4.0] Publishable Unit 4
 ### Added
 - Add `source_me.sh`

@@ -1,0 +1,29 @@
+services:
+  maf:
+    container_name: maf
+    user: admin
+    image: maf:local
+    build:
+      # ../ here means relative to the docker-compose.yml file.
+      context: ./
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # You want the container to stay up forever while you're developing.
+    command: sleep infinity
+    volumes:
+      - type: bind
+        # ../ here means relative to the docker-compose.yml file.
+        source: ./
+        target: /opt/repo/
+    networks:
+      - local-default
+
+networks:
+  local-default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1350
+    ipam:
+      config:
+        - subnet: 192.168.4.0/24
+

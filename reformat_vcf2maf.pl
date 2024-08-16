@@ -7,6 +7,7 @@ use List::MoreUtils qw(firstidx uniq);
 use List::Util qw(max);
 use File::Basename;
 use Getopt::Long;
+#use match::simple;
 
 my $vcflist;
 my $pass;
@@ -25,21 +26,24 @@ my $print_header = 0;
 my @main_csq_header;
 my $sample_list;
 my @sample_list;
+my $transcript_list;
+my %alt_transcripts;
 
 
 GetOptions ("vcflist=s"     => \$vcflist,
-            "pass"          => \$pass,
+			"pass"          => \$pass,
 			"keep"          => \$keep_only,
 			"keepPA"        => \$keepPA_only,
-            "af_col=s"      => \$pop_af,
-            "voi_only"      => \$voi_only,
-            "build=s"       => \$build,
-            "tum_vaf:f"     => \$cutoff,
+			"af_col=s"      => \$pop_af,
+			"voi_only"      => \$voi_only,
+			"build=s"       => \$build,
+			"tum_vaf=f"     => \$cutoff,
 			"vaf_filter_type=s" => \$vaf_filter_type,
 			"indel_filter"  => \$indel_filter,
 			"dbsnp_filter"  => \$common_snp_filter,
 			"keep_multi"    => \$keep_multi,
-            "sample_list:s" => \$sample_list);
+			"sample_list=s" => \$sample_list,
+			"transcripts=s" => \$transcript_list);
 
 if (!$vcflist) {
 	print STDERR <<END;
@@ -62,16 +66,20 @@ if (!$vcflist) {
 	Output options:
 		--pass                Print out PASS calls only (based only on PASS filter)
 		--voi_only            Print out variants of interest only (not compatible with --keep)
-		--keep                Print out 'keep' and 'keep-PA' variants only (not compatible with --voi_only or --keepPA)
+		--keep                Print out 'keep' and 'keep-PA' variants only (not compatible with
+		                      --voi_only or --keepPA)
 		--keepPA              Print out 'keep-PA' variants only (not compatible with --voi_only or --keep)
 
 		--tum_vaf [vaf]       Print out variants with tumour VAF above this value [default: not used].
 		                         Works with any of the 4 output options above.
 		--sample_list [file]  Print to file a list of tumour and normal samples from the VCF list.
-		--vaf_filter_type [all|snv|indel]   Apply --tum_vaf cutoff to this type pf variant only. snv includes mnvs from Caveman/Mutetct.
+		--vaf_filter_type [all|snv|indel]   Apply --tum_vaf cutoff to this type pf variant only. snv includes
+		                                    mnvs from Caveman/Mutetct.
 		--indel_filter        Apply indel filtering based on REF and ALT length, VAF and T/N depth; remove ONPs
 		--dbsnp_filter        Exclude variants flagged with "dbSNP=COMMON" in the INFO column
 		--keep_multi          Skip multi-allelic sites (ALT allele has at least one comma ",")
+		--transcripts [file]  A file with a list of "Hugo_symbol[TAB]Transcript_ID" (no header), indicating the
+		                      non-canonical transcript to use when selecting consequence annotations.
 
 END
 	exit;
@@ -115,6 +123,7 @@ print STDERR "--indel_filter: $indel_filter\n" if $indel_filter;
 print STDERR "--dbsnp_filter: $common_snp_filter\n" if $common_snp_filter;
 print STDERR "--vaf_filter_type: $vaf_filter_type\n" if $vaf_filter_type;
 print STDERR "--keep_multi: $keep_multi\n" if $keep_multi;
+print STDERR "--transcripts: $transcript_list\n" if $transcript_list;
 
 if ($check_af == 0) {
 	print STDERR "Option --af_col not used; 'voi' and 'keep' will not consider population frequencies\n";
@@ -128,6 +137,18 @@ if ($keep_multi) {
 
 my @vcflist = `cat $vcflist`;
 chomp @vcflist;
+
+if ($transcript_list) {
+	open TRANS, "<$transcript_list" or die "Can't open $transcript_list\n";
+	while (<TRANS>) {
+		chomp;
+		my ($gene, $trans_id) = split(/\t/, $_);
+		die "Error in transcript file; gene and transcript ID not found\n" if !$gene || !$trans_id;
+		$alt_transcripts{$gene} = $trans_id;
+	}
+	close TRANS;
+	print STDERR "Using transcripts in $transcript_list\n";
+}
 
 # Get the TSV column headers, excluding CSQ headers
 my @header = get_column_headers();
@@ -163,10 +184,6 @@ my %keep_cons = (
 my %so2maf = %{convert_so2maf()};
 
 my %csq_check_headers;
-
-if ($sample_list) {
-	open SAM, ">$sample_list" || die "Can't open $sample_list\n";
-}
 
 my @samples;
 
@@ -204,9 +221,9 @@ foreach my $vcf (@vcflist) {
 				@csq_header = fix_csq_header(\@csq_header);
 				# Print out the header only once
 				if (!@main_csq_header) {
-					my @headers_to_check = ("BIOTYPE", "CANONICAL", "Consequence", "HGVSp", $pop_af, "Hugo_Symbol", "SOURCE", "Existing_variation");
+					my @headers_to_check = ("BIOTYPE", "CANONICAL", "Consequence", "HGVSp", $pop_af, "Hugo_Symbol", "SOURCE", "Existing_variation", "Transcript_ID");
 					%csq_check_headers = parse_csq_header(\@csq_header, @headers_to_check);
-					foreach my $colname ("BIOTYPE", "CANONICAL", "Consequence", $pop_af) {
+					foreach my $colname ("BIOTYPE", "CANONICAL", "Consequence", $pop_af, "Transcript_ID") {
 						if (! defined($csq_check_headers{$colname})) {
 							die "ERROR: CSQ in header is missing \"$colname\"\n" if $colname ne $pop_af || (($colname eq $pop_af) && $check_af);
 						}
@@ -215,9 +232,9 @@ foreach my $vcf (@vcflist) {
 				} elsif (! @main_csq_header ~~ @csq_header ) {
 					die "VCF CSQ headers in $vcf are not consistent\n";
 				}
-				my @headers_to_check = ("BIOTYPE", "CANONICAL", "Consequence", "HGVSp", $pop_af, "Hugo_Symbol", "SOURCE", "Existing_variation");
+				#my @headers_to_check = ("BIOTYPE", "CANONICAL", "Consequence", "HGVSp", $pop_af, "Hugo_Symbol", "SOURCE", "Existing_variation", "Transcript_ID");
 #				#%csq_check_headers = parse_csq_header(\@main_csq_header, @headers_to_check);
-				%csq_check_headers = parse_csq_header(\@csq_header, @headers_to_check);
+				#%csq_check_headers = parse_csq_header(\@csq_header, @headers_to_check);
 				if ($print_header == 0) {
 					foreach my $remove ("Hugo_Symbol", "Existing_variation", "SOURCE") {
 						$main_csq_header[$csq_check_headers{$remove}] = "REMOVE" if $csq_check_headers{$remove};
@@ -570,6 +587,7 @@ foreach my $vcf (@vcflist) {
 
 if ($sample_list) {
 	@sample_list = uniq @sample_list;
+	open SAM, ">$sample_list" || die "Can't open $sample_list\n";
 	print SAM @sample_list;
 	close SAM;
 }
@@ -748,7 +766,16 @@ sub flag_voi {
 	}
 
 	# Determine variants of interest, variants to keep and main consequence
-	if (($csq[$csq_idx{BIOTYPE}] ne 'protein_coding') || ($csq[$csq_idx{CANONICAL}] ne 'YES') || $flag ne 'PASS') {
+	# If a list of non-canonical transcripts is provided, first check for those
+	if ($transcript_list && exists($alt_transcripts{$csq[$csq_idx{Hugo_Symbol}]})) {
+		if ($alt_transcripts{$csq[$csq_idx{Hugo_Symbol}]} ne $csq[$csq_idx{Transcript_ID}]) {
+			return ('no', 'no', $main_csq)
+		}
+		# DEBUG
+		else {
+			#print "Found BRAF $csq[$csq_idx{Transcript_ID}]\n";
+		}
+	} elsif (($csq[$csq_idx{BIOTYPE}] ne 'protein_coding') || ($csq[$csq_idx{CANONICAL}] ne 'YES') || $flag ne 'PASS') {
 		return ('no', 'no', $main_csq);
 	} elsif ($check_af && $highest_af ne '.' && $highest_af ne '-' && $highest_af >= 0.01) {  # common SNP cutoff
 		return('no', 'no', $main_csq);

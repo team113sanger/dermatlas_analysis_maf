@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### TODO 
 Resolve naming discrepancy between `somatic_variants_qc.sh` in QC repo and in nextflow pipeline which calls this repo `qc_somatic_variants.sh`
 
+## [0.5.2] - 2024-08-16
+### Added
+- Added an option to `reformat_vcf2maf.pl` to use a list of alternative transcripts for variant consequence annotation.
+
 ## [0.5.1] Housekeeping
 ### Changed
 - Ran styling on all R files. Kept deliberately seperate from 0.5.0 changes

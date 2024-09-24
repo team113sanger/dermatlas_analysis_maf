@@ -432,7 +432,7 @@ foreach my $vcf (@vcflist) {
 						print STDERR "Skipping : low tumour VAF in $line\n";
 						next;
 					}
-				} elsif ($gatk_hc == 1 && $cutoff && $vaf < $cutoff) {
+				} elsif ($gatk_hc == 1 && $cutoff && $vaf_norm < $cutoff) {
 					my $type;
 					if (length($ref) == length($alt)) {
 						$type = 'snv'; # filter snv and mnv the same way
@@ -449,7 +449,9 @@ foreach my $vcf (@vcflist) {
 				# if not, keep if tum VAF > 0.25 and depth in T and N are both >= 20. Subtract 1 to length to account for anchor base
 				if ($indel_filter && ($strelka == 1 || $pindel == 1 || $gatk_hc == 1)) {
 					if (! (length($ref) - 1 <= 25 && length($alt) - 1 <= 25 && !(length($ref) - 1 > 10 && length($alt) - 1 > 10) && $type ne 'ONP')) {
-						if ($vaf > 0.25 && $dp_tum >= 20 && $dp_norm >= 20 && $type ne 'ONP') {
+						if ($gatk_hc != 1 && $vaf > 0.25 && $dp_tum >= 20 && $dp_norm >= 20 && $type ne 'ONP') {
+							# do nothing
+						} elsif ($gatk_hc == 1 && $vaf_norm > 0.25 && $dp_norm >= 20 && $type ne 'ONP') {
 							# do nothing
 						} else {
 							print STDERR "Skipping indel: $line\n";

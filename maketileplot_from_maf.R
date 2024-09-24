@@ -669,7 +669,7 @@ make_mutation_plot <- function(data, legendpos = "top", nrow = 2, ncol = 5, vlin
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
       axis.text.x = element_text(size = sizex, family = "mono", color = "black", angle = 90, hjust = 1, vjust = 0.5),
-      axis.text.y = element_text(size = sizey, family = "sans", face = "plain", color = "black"),
+      axis.text.y = element_text(size = sizey, family = "sans", face = "italic", color = "black"),
       legend.position = legendpos,
       legend.margin = margin(b = 0, unit = "cm"),
       # below: box around legend

@@ -28,6 +28,8 @@ my $sample_list;
 my @sample_list;
 my $transcript_list;
 my %alt_transcripts;
+my $help;
+my $more_help;
 
 
 GetOptions ("vcflist=s"     => \$vcflist,
@@ -43,45 +45,15 @@ GetOptions ("vcflist=s"     => \$vcflist,
 			"dbsnp_filter"  => \$common_snp_filter,
 			"keep_multi"    => \$keep_multi,
 			"sample_list=s" => \$sample_list,
-			"transcripts=s" => \$transcript_list);
+			"transcripts=s" => \$transcript_list,
+			"help"          => \$help,
+			"more_help"    => \$more_help);
 
-if (!$vcflist) {
-	print STDERR <<END;
-
-	Convert a VCF file to tab-delimited, compatible with Maftools.
-
-	Usage: reformat_vcf2maf.pl --vcflist [file] 
-	
-	where file is a file with a list of VCF files (full or relative paths). File formats
-	parsed are MuTect (v1), Strelka2, Mutect2, GATK gemline, cgpCaVEMan and cgpPindel 
-	and may be a combination of any of these. VCF type will be determined by header information.
-
-	Optional:
-
-		--af_col    Column name with population AFs to be used when filtering variants to 'keep'
-		            and  variants of interest (along with variant consequences. Population AF 
-		            cutoffs 0.01 (common SNPs) and 0.001 used for 'keep' and 'voi', respectively).
-		--build     NCBI Genome build [default: GRCh38]
-
-	Output options:
-		--pass                Print out PASS calls only (based only on PASS filter)
-		--voi_only            Print out variants of interest only (not compatible with --keep)
-		--keep                Print out 'keep' and 'keep-PA' variants only (not compatible with
-		                      --voi_only or --keepPA)
-		--keepPA              Print out 'keep-PA' variants only (not compatible with --voi_only or --keep)
-
-		--tum_vaf [vaf]       Print out variants with tumour VAF above this value [default: not used].
-		                         Works with any of the 4 output options above.
-		--sample_list [file]  Print to file a list of tumour and normal samples from the VCF list.
-		--vaf_filter_type [all|snv|indel]   Apply --tum_vaf cutoff to this type pf variant only. snv includes
-		                                    mnvs from Caveman/Mutetct.
-		--indel_filter        Apply indel filtering based on REF and ALT length, VAF and T/N depth; remove ONPs
-		--dbsnp_filter        Exclude variants flagged with "dbSNP=COMMON" in the INFO column
-		--keep_multi          Skip multi-allelic sites (ALT allele has at least one comma ",")
-		--transcripts [file]  A file with a list of "Hugo_symbol[TAB]Transcript_ID" (no header), indicating the
-		                      non-canonical transcript to use when selecting consequence annotations.
-
-END
+if ($more_help) {
+	print(usage("long"));
+	exit;
+} elsif (!$vcflist || $help) {
+	print(usage("short"));
 	exit;
 }
 
@@ -1226,3 +1198,111 @@ sub get_protein_change {
 
 	return $hgvsp;
 }
+
+
+# Usage message
+
+sub usage {
+
+	my $which = shift(@_);
+
+	my $usage = <<END;
+
+    Convert a VCF file to tab-delimited MAF file, compatible with Maftools.
+
+    Usage: reformat_vcf2maf.pl --vcflist [file] [options]
+    
+    where file is a file with a list of VCF files (full or relative paths). File formats
+    parsed are MuTect (v1), Strelka2, Mutect2, GATK gemline, cgpCaVEMan and cgpPindel 
+    and may be a combination of any of these. VCF type will be determined by header information.
+
+    General options:
+
+        --build [string]      NCBI Genome build for the 'NCBI_Build' MAF column. [default: GRCh38] 
+        --sample_list [file]  Print to file a list of tumour and normal samples from the VCF list.
+        --help                Prints help to screen.
+        --more_help           Prints extended help to screen.
+
+    Optional variant filters:
+
+        --tum_vaf [vaf]       Print out variants with tumour VAF above this value. [default: not used]
+                                If the VCF is detected as germline, --tum_vaf applies to the normal VAF.
+                                Value is a fraction between 0 and 1 (e.g. 0.1, not a percentage).
+                                Compatible with --pass/--voi_only/--keep/--keepPA.
+
+        --vaf_filter_type [all|snv|indel]    Apply --tum_vaf cutoff to this type of variant only.
+                                               The snv includes mnvs from Caveman/Mutect.
+
+        --indel_filter        Apply indel filtering based on REF and ALT length, VAF and T/N depth; remove ONPs.
+        --dbsnp_filter        Exclude variants flagged with "dbSNP=COMMON" in the VCF INFO column.
+        --keep_multi          Keep and split multi-allelic sites to one per line. (ALT allele has at least one comma ",")
+
+    Optional consequence filters:
+
+        Applying none of the 4 options below generates a MAF with all variants and in all transcripts.
+        Otherwise, select only 1 of 4 options below:
+
+        --pass                Print out PASS calls only.
+        --keep                Print out 'keep' and 'keep-PA' variants only.
+        --keepPA              Print out 'keep-PA' variants only.
+        --voi_only            Print out 'variants of interest' only.
+
+            **** See extended help for definitions ****
+
+        --af_col [string]     Column name with population AFs to be used when filtering by consequence.
+                                Applies to --keep/--keepPA/--af_col. AF cutoffs are 0.01 for --keepPA/--keep and 0.001 for --voi.
+
+        --transcripts [file]  A file with a list of "Hugo_Symbol[TAB]Transcript_ID" (no header), indicating the
+                                non-canonical transcript to use when selecting consequence annotations. See --more_help. 
+
+END
+
+	my $extra = <<END;
+    Example command line:
+
+        # Print out protein-altering variants in canonical transcripts, unless it has gnomAD_AF >= 0.01,
+        # and use alternative transcripts in alt_transcripts.tsv. Remove indels with VAF < 0.1.
+        # Remove variants annotated with "dbSNP=COMMON" and apply the internal indel filter.
+
+        reformat_vcf2maf.pl --vcflist vcf.list --keepPA --tum_vaf 0.1 --vaf_filter_type indel \
+            --indel_filter --af_col gnomAD_AF --transcripts alt_transcripts.tsv --dbsnp_filter > out.nmaf
+
+
+    IMPORTANT NOTES:
+
+    * A variant is designated in the 'keep' column as 'keep' if the MAF if it is PASS is the VCF, has population
+           AF < 0.01, the variant consequence is in a coding exon or splice site, and the variant is in a canonical
+           transcript. Includes synonymous variants.
+
+    * A variant is designated in the 'keep' column as 'keep-PA' based on the same criteria above, except the variant
+           consequence is protein-altering (PA). i.e. synonymous variants are excluded.
+
+    * A variant is designated in the 'voi' column as 'yes' based on the same criteria as 'keep-PA' variants, except
+           the population AF < 0.001.
+
+    * If the --pass option is used without any other options, all PASS variants in all transcripts and all consequence
+           types are printed to the MAF, except multi-allelic sites (unless --keep_multi is used).
+
+    * The --pass flag can be used with any of the variant or consequence filter options.
+
+    * If --af_col is not used, the criteria for the 'voi' and 'keep' columns will exclude population AFs.
+
+    * The --transcripts option is used to specify a specific Ensembl transcript to use. For example, if an old Ensembl
+           version incorrectly assigns the canonical transcript, or if there are different Ensembl genes/transcripts 
+           IDs associated with the same HUGO symbol and you only want to pick one gene/transcript. Default is to use
+           the canonical transcript as indicated in the VCF VEP annotation.
+
+    * If --transcripts is used, the 'CANONICAL' MAF column will not be altered, but the 'voi' and 'keep' columns
+           will be correct, i.e. for genes in the transcripts list, the Ensembl canonical transcript 
+           will be set to 'voi' = 'no' and 'keep' = 'no', while the transcripts in the --transcripts file
+           will be evaluated as described above and the status set accordingly.
+
+END
+
+	if ($which eq 'long') {
+		print STDERR "LONG\n";
+		$usage = $usage . $extra;
+	}
+	return $usage;
+}
+

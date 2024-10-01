@@ -744,10 +744,8 @@ sub flag_voi {
 	if ($transcript_list && exists($alt_transcripts{$csq[$csq_idx{Hugo_Symbol}]})) {
 		if ($alt_transcripts{$csq[$csq_idx{Hugo_Symbol}]} ne $csq[$csq_idx{Transcript_ID}]) {
 			return ('no', 'no', $main_csq)
-		}
-		# DEBUG
-		else {
-			#print "Found BRAF $csq[$csq_idx{Transcript_ID}]\n";
+		} elsif (($csq[$csq_idx{BIOTYPE}] ne 'protein_coding') || $flag ne 'PASS') {
+			return ('no', 'no', $main_csq);
 		}
 	} elsif (($csq[$csq_idx{BIOTYPE}] ne 'protein_coding') || ($csq[$csq_idx{CANONICAL}] ne 'YES') || $flag ne 'PASS') {
 		return ('no', 'no', $main_csq);

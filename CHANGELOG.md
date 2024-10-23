@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### TODO 
 Resolve naming discrepancy between `somatic_variants_qc.sh` in QC repo and in nextflow pipeline which calls this repo `qc_somatic_variants.sh`
 
+## [0.5.5] - 2024-10-23
+### Added
+- Add `--canonical` and `--exclude_noncoding` options to use with `--pass` option in `reformat_vcf2maf.pl`
+### Fixed
+- Fixed bug in `plot_vaf_vs_depth_from_maf.pl` that occurred when MAF has samples that are not in --samplelist
+
 ## [0.5.4] - 2024-10-01
+### Fixed
 - Fixed `reformat_vcf2maf.pl` filtering of genes/transcripts in the --transcripts list, if used.
 - Previous incorrect behaviour: keep/voi status incorrect due to not checking for PASS, protein-coding
 - Corrected behaviour: all transcript in --transcripts list are checked as PASS and protein-coding

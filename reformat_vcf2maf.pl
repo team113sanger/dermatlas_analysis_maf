@@ -28,6 +28,8 @@ my $sample_list;
 my @sample_list;
 my $transcript_list;
 my %alt_transcripts;
+my $canonical;
+my $exclude_noncoding;
 my $help;
 my $more_help;
 
@@ -46,6 +48,8 @@ GetOptions ("vcflist=s"     => \$vcflist,
 			"keep_multi"    => \$keep_multi,
 			"sample_list=s" => \$sample_list,
 			"transcripts=s" => \$transcript_list,
+			"canonical"     => \$canonical,
+			"exclude_noncoding" => \$exclude_noncoding,
 			"help"          => \$help,
 			"more_help"    => \$more_help);
 
@@ -60,6 +64,8 @@ if ($more_help) {
 if (($keep_only && $voi_only) || ($keep_only && $keepPA_only) || ($voi_only && $keepPA_only)) {
 	print STDERR "$keep_only, $voi_only, $keepPA_only\n";
 	die "Choose EITHER --keep or --keepPA or --voi_only\n";
+} elsif (($keep_only || $voi_only || $keepPA_only) && ($exclude_noncoding || $canonical)) {
+	die "Error: --exclude_noncoding and --canonical are not necessary with --keep and --keepPA\nSee reformat_vcf2maf.pl --help\n";
 }
 
 my $check_af = $pop_af && $pop_af ne 'N/A' ? 1 : 0;
@@ -96,6 +102,8 @@ print STDERR "--dbsnp_filter: $common_snp_filter\n" if $common_snp_filter;
 print STDERR "--vaf_filter_type: $vaf_filter_type\n" if $vaf_filter_type;
 print STDERR "--keep_multi: $keep_multi\n" if $keep_multi;
 print STDERR "--transcripts: $transcript_list\n" if $transcript_list;
+print STDERR "--canonical: $canonical\n" if $canonical;
+print STDERR "--exclude_noncoding: $exclude_noncoding\n" if $exclude_noncoding;
 
 if ($check_af == 0) {
 	print STDERR "Option --af_col not used; 'voi' and 'keep' will not consider population frequencies\n";
@@ -150,6 +158,13 @@ my %keep_cons = (
 	'start_retained_variant' => 1,
 	'stop_retained_variant' => 1,
 	'synonymous_variant' => 1,
+);
+
+my %exclude_noncoding = (
+	'intron_variant' => 1,
+	'upstream_gene_variant' => 1,
+	'downstream_gene_variant' => 1,
+	'intergenic_variant' => 1
 );
 
 # Convert VEP SO term to maftools-style terms
@@ -442,6 +457,13 @@ foreach my $vcf (@vcflist) {
 					# split with -1 to include empty fields
 					my @cs = split(/\|/, $c, -1);
 
+					# Skip if --canonical and transcript is not canonical,
+					# unless transcript is in --transcripts list
+					if ($canonical && $transcript_list && exists($alt_transcripts{$cs[$csq_check_headers{Hugo_Symbol}]})) {
+						next if $alt_transcripts{$cs[$csq_check_headers{Hugo_Symbol}]} ne $cs[$csq_check_headers{Transcript_ID}];
+					} elsif ($canonical) {
+						next if $cs[$csq_check_headers{CANONICAL}] ne 'YES';
+					}
 					# Check choose the consequences that match the alt allele;
 					# This is used to get the consequences for multi-allelic sites
 					# (NB: mutect v1, pindel and strelka do not have multi-allelic sites
@@ -458,6 +480,12 @@ foreach my $vcf (@vcflist) {
 					# other vaf, check biotype, main consequence, canonical status
 					# in order to flag consequence lines to keep
 					my ($voi, $keep, $main_csq) = flag_voi(\@cs, $passfilt, \%csq_check_headers, $check_af);
+
+                    # If --exclude_noncoding is used, check the $main_csq
+					if ($exclude_noncoding && $exclude_noncoding{$main_csq}) {
+						print STDERR "Skipping non-coding consequence\n";
+						next;
+					}
 
 					# Get the maftools consequence term
 					if (! $so2maf{$main_csq}) {
@@ -997,8 +1025,8 @@ sub pindel_stats {
 	my $FD_index = firstidx { $_ eq 'FD' } @$format;
 ##	my $vaf = sprintf("%.10g", $tum_format->[$FC_index]/$tum_format->[$FD_index]);
 ##	my $vaf_norm = sprintf("%.10g", $norm_format->[$FC_index]/$norm_format->[$FD_index]);
-	my $vaf = sprintf("%.3f", $tum_format->[$FC_index]/$tum_format->[$FD_index]);
-	my $vaf_norm = sprintf("%.3f", $norm_format->[$FC_index]/$norm_format->[$FD_index]);
+	my $vaf = $tum_format->[$FD_index] == 0 ? 0 : sprintf("%.3f", $tum_format->[$FC_index]/$tum_format->[$FD_index]);
+	my $vaf_norm = $norm_format->[$FD_index] == 0 ? 0 : sprintf("%.3f", $norm_format->[$FC_index]/$norm_format->[$FD_index]);
 	my $tum_ref = $tum_format->[$FD_index] - $tum_format->[$FC_index];
 	my $norm_ref = $norm_format->[$FD_index] - $norm_format->[$FC_index];
 	my $tum_counts = join("\t", $tum_ref, $tum_format->[$FC_index]);
@@ -1253,6 +1281,12 @@ sub usage {
         --transcripts [file]  A file with a list of "Hugo_Symbol[TAB]Transcript_ID" (no header), indicating the
                                 non-canonical transcript to use when selecting consequence annotations. See --more_help. 
 
+        --canonical           Print out variants with consequences affecting the canonical transcript only, unless
+                                --transcripts is used and the transcript is found in --transcripts list. Can be used with --pass.
+
+        --exclude_noncoding   Do not print out variants that are intronic, upstream/downstream or intergenic.
+                                Can be used with --pass.
+
 END
 
 	my $extra = <<END;
@@ -1295,6 +1329,10 @@ END
            will be set to 'voi' = 'no' and 'keep' = 'no', while the transcripts in the --transcripts file
            will be evaluated as described above and the status set accordingly.
 
+    * The --canonical flag can be used with or without --pass and with or without --transcripts. If used with --transcxripts,
+           only the transcripts in the --transcripts list will be printed out for those genes. No need to specify with
+           --keep/--keepPA/--voi.
+ 
 END
 
 	if ($which eq 'long') {

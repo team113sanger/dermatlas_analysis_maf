@@ -336,6 +336,8 @@ df_all <- df
 all_samples <- ""
 if (!is.null(samplefile)) {
   all_samples <- sort(samplelist$V1)
+  df <- df %>% filter(Tumor_Sample_Barcode %in% samplelist$V1)
+  df_all <- df_all %>% filter(Tumor_Sample_Barcode %in% samplelist$V1)
 } else {
   all_samples <- sort(unique(df_all$Tumor_Sample_Barcode))
 }

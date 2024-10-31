@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### TODO 
 Resolve naming discrepancy between `somatic_variants_qc.sh` in QC repo and in nextflow pipeline which calls this repo `qc_somatic_variants.sh`
 
+## [0.6.0] - 2024-10-31
+### Added
+- Add functionality to `plot_vaf_vs_depth_from_maf.R` to allow plotting of AF vs Depth from germline `VAF_norm` and `n_depth`
+- Add functionality to `maketileplot_from_maf.R` to use a genelist with format `Hugo_Symbol/Gene` for non-human data sets
+
 ## [0.5.5] - 2024-10-23
 ### Added
 - Add `--canonical` and `--exclude_noncoding` options to use with `--pass` option in `reformat_vcf2maf.pl`

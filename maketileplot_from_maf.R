@@ -41,6 +41,10 @@ option_list <- list(
     type = "character", default = NULL,
     help = "File of genes to plot [default = %default]", metavar = "character"
   ),
+  make_option("--geneid_list",
+    action = "store_true", default = FALSE,
+    help = "List in --genelist is in format 'Hugo_Symbol/Gene'"
+  ),
   make_option(c("-f", "--filter_col"),
     type = "character", default = NULL,
     help = "Column name and value to filter on (colname, value) [default = %default]", metavar = "character"
@@ -165,6 +169,9 @@ if (isTRUE(opt$sortbymutations) && isTRUE(opt$sortbygenelist)) {
   stop("Cannot sort by number of mutations AND gene list")
 }
 
+if (isTRUE(opt$geneid_list) && is.null(opt$genelist)) {
+  stop("Option --geneid_list must be used with --genelist")
+}
 
 #############
 # FUNCTIONS #
@@ -826,8 +833,16 @@ for (file in filelist) {
   # colnames(data)<-c("Gene", "Effect", "Sample")
 
   data <- shorten_consequence(data)
+
+  # If gene list is format HugoSymbol/ENSGID
+  if (isTRUE(opt$geneid_list)) {
+    data <- data %>%
+      mutate(Hugo_Symbol_Orig = Hugo_Symbol) %>%
+      unite("Hugo_Symbol", c(Hugo_Symbol_Orig, Gene), sep = "/", remove = F)
+  } else { 
   # if no gene symbol, use Ensembl ID in Gene column
-  data <- data %>% mutate(Hugo_Symbol = ifelse(Hugo_Symbol == "-", Gene, Hugo_Symbol))
+    data <- data %>% mutate(Hugo_Symbol = ifelse(Hugo_Symbol == "-", Gene, Hugo_Symbol))
+  }
   data$Gene <- factor(data$Gene, levels = unique(data$Gene))
   data$Hugo_Symbol <- factor(data$Hugo_Symbol, levels = unique(data$Hugo_Symbol))
   data$Tumor_Sample_Barcode <- factor(data$Tumor_Sample_Barcode, levels = unique(data$Tumor_Sample_Barcode))

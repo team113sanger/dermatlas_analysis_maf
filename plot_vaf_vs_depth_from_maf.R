@@ -39,6 +39,7 @@ the variants file, or a subset of genes specified from a list of genes.
     <noindels> Ingore indels (only SNVs and MNVs will be considered)
     <indels_only> Plot indels only
     <protein_alt> Exclude variants with main consequence synonymous, stop/start retained, splice_region
+    <germline> Use n_depth and VAF_norm for AF vs Depth plots
 
   Options for AF vs Depth plots:
     <width=f> Width (inches) of AF vs Depth by sample plots
@@ -93,7 +94,7 @@ top_genes <- function(df) {
 process_variants <- function(df) {
   df <- df %>%
     filter(str_detect(Keep, "keep")) %>%
-    select(Gene, Hugo_Symbol, Chromosome, POS_VCF, Reference_Allele, Tumor_Seq_Allele2, Variant_Type, VAF_tum, t_depth, Tumor_Sample_Barcode, Main_consequence_VEP, Consequence, Keep) %>%
+    select(Gene, Hugo_Symbol, Chromosome, POS_VCF, Reference_Allele, Tumor_Seq_Allele2, Variant_Type, VAF_tum, t_depth, VAF_norm, n_depth, Tumor_Sample_Barcode, Main_consequence_VEP, Consequence, Keep) %>%
     unite("Gene_Name", c(Hugo_Symbol, Gene), sep = "/", remove = F) %>%
     mutate(reflen = str_length(Reference_Allele), altlen = str_length(Tumor_Seq_Allele2)) %>%
     mutate(Reference_Allele_c = ifelse(Variant_Type == "SNP",
@@ -134,13 +135,13 @@ process_variants <- function(df) {
 
 # Create a ggplot object for VAF vs depth, by sample
 
-make_af_vs_d_plots <- function(df, ncol, type) {
+make_af_vs_d_plots <- function(df, ncol, type, depth_col, vaf_col) {
   if (type == "snv") {
     colours <- brewer.pal(n = 8, name = "Dark2")
   } else {
     colours <- "black"
   }
-  plot <- ggplot(df, aes(x = t_depth, y = VAF_tum, colour = Mutation)) +
+  plot <- ggplot(df, aes(x = .data[[depth_col]], y = .data[[vaf_col]], colour = Mutation)) +
     geom_point(shape = 1, size = 2, alpha = 0.60, stroke = 1) +
     theme_bw() +
     facet_wrap(~Tumor_Sample_Barcode, ncol = ncol, drop = F) +
@@ -167,15 +168,14 @@ make_af_vs_d_plots <- function(df, ncol, type) {
     geom_vline(aes(xintercept = 300), linetype = "dashed", colour = "grey50")
   # theme(strip.text = element_text(size=7), legend.text = element_text(size=7), axis.title = element_text(size=8), axis.text = element_text(size=6))
   # facet_wrap(~Sample, ncol=4, scales = "free_y") + scale_y_log10()
-
   return(plot)
 }
 
 
 # Create a ggplot object for VAF vs depth, by gene
 
-make_plots <- function(df, ncol, labels = NULL) {
-  plot <- ggplot(df, aes(x = t_depth, y = VAF_tum, colour = Mutation)) +
+make_plots <- function(df, ncol, depth_col, vaf_col, labels = NULL) {
+  plot <- ggplot(df, aes(x = .data[[depth_col]], y = .data[[vaf_col]], colour = Mutation)) +
     geom_point(shape = 1, size = 2, alpha = 0.70, stroke = 2) +
     theme_bw()
 
@@ -356,7 +356,11 @@ df_snv_only$Tumor_Sample_Barcode <- factor(df_snv_only$Tumor_Sample_Barcode, lev
 # Make a VAF vs Read Depth plot for SNV/MNV
 
 if (nrow(df_snv) > 0) {
-  snv_plot <- make_af_vs_d_plots(df_snv, ncol, "snv")
+  if (isTRUE(germline)) {
+    snv_plot <- make_af_vs_d_plots(df_snv, ncol, "snv", "n_depth", "VAF_norm")
+  } else {
+    snv_plot <- make_af_vs_d_plots(df_snv, ncol, "snv", "t_depth", "VAF_tum")
+  }
   snv_filename <- make_file_name("AF_vs_depth_snv", "samples", suffix, noindels, indels_only, protein_alt)
   print_plot(snv_plot, snv_filename, width, height)
 } else {
@@ -366,7 +370,11 @@ if (nrow(df_snv) > 0) {
 # Make a VAF vs Read Depth plot for indels
 
 if (nrow(df_indel) > 0) {
-  indel_plot <- make_af_vs_d_plots(df_indel, ncol, "indel")
+  if (isTRUE(germline)) {
+    indel_plot <- make_af_vs_d_plots(df_indel, ncol, "indel", "n_depth", "VAF_norm")
+  } else {
+    indel_plot <- make_af_vs_d_plots(df_indel, ncol, "indel", "t_depth", "VAF_tum")
+  }
   indel_filename <- make_file_name("AF_vs_depth_indel", "samples", suffix, noindels, indels_only, protein_alt)
   print_plot(indel_plot, indel_filename, width, height)
 } else {
@@ -451,7 +459,13 @@ sites_df$Mutation <- factor(sites_df$Mutation, levels = mut_order)
 facet_labels <- top_12_sites$Gene_Name
 names(facet_labels) <- gene_order
 # print(facet_labels)
-sites_plot <- make_plots(sites_df, ncol_r, facet_labels)
+
+if(isTRUE(germline)) {
+  sites_plot <- make_plots(sites_df, ncol_r, "n_depth", "VAF_norm", facet_labels)
+} else {
+  sites_plot <- make_plots(sites_df, ncol_r, "t_depth", "VAF_tum", facet_labels)
+}
+
 sites_filename <- make_file_name("AF_vs_depth_recurrent", "sites", suffix, noindels, indels_only, protein_alt)
 print_plot(sites_plot, sites_filename, width_r, height_r)
 
@@ -480,7 +494,12 @@ genes_df$Gene_Name <- factor(genes_df$Gene_Name, levels = gene_order2)
 genes_df$Mutation <- factor(genes_df$Mutation, levels = mut_order)
 
 # Make a VAF vs Read Depth plot
-genes_plot <- make_plots(genes_df, ncol_r)
+if(isTRUE(germline)) {
+  genes_plot <- make_plots(genes_df, ncol_r, "n_depth", "VAF_norm")
+} else {
+  genes_plot <- make_plots(genes_df, ncol_r, "t_depth", "VAF_tum")
+}
+
 genes_filename <- make_file_name("AF_vs_depth_recurrent", "genes", suffix, noindels, indels_only, protein_alt)
 print_plot(genes_plot, genes_filename, width_r, height_r)
 

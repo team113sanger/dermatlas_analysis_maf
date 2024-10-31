@@ -645,7 +645,14 @@ make_mutation_plot <- function(data, legendpos = "top", nrow = 2, ncol = 5, vlin
     select(-value) %>%
     rename(Sample.index = variable) %>%
     mutate(Sample.index = as.numeric(Sample.index))
-  missing["Effect"] <- NA
+
+  if (nrow(missing) > 0) {
+    missing["Effect"] <- NA
+  } else {
+    missing[1, ] <- NA
+    missing["Effect"] <- NA
+    missing <- missing[0, ]
+  }
 
   # Now, adjust the sample coordinates for genes with multiple mutations; need to shift half-tiles by 0.25
 

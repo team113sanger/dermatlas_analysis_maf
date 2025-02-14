@@ -774,6 +774,8 @@ sub flag_voi {
 			return ('no', 'no', $main_csq)
 		} elsif (($csq[$csq_idx{BIOTYPE}] ne 'protein_coding') || $flag ne 'PASS') {
 			return ('no', 'no', $main_csq);
+	    } elsif ($check_af && $highest_af ne '.' && $highest_af ne '-' && $highest_af >= 0.01) {  # common SNP cutoff
+			return('no', 'no', $main_csq);
 		}
 	} elsif (($csq[$csq_idx{BIOTYPE}] ne 'protein_coding') || ($csq[$csq_idx{CANONICAL}] ne 'YES') || $flag ne 'PASS') {
 		return ('no', 'no', $main_csq);

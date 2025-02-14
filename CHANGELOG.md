@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### TODO 
 Resolve naming discrepancy between `somatic_variants_qc.sh` in QC repo and in nextflow pipeline which calls this repo `qc_somatic_variants.sh`
 
+## [0.6.2] - 2025-02-13
+### Fixed
+- Fixed `reformat_vcf2maf.pl` but that only affects gnomAD filtering of keep/keepPA variants for genes in --transcript 
+- See tag 0.5.2
+
 ## [0.6.1] - 2024-10-31
 ### Fixed
 - Fixed `maketileplot_from_maf.R` error with edge cases where all genes and all samples are mutated

@@ -8,13 +8,19 @@ STUDY=$2
 VERSION=$3
 RELEASE=$4
 
-# Check scripts directory for maf2xlsx.R script
+# Check for maf2xlsx.R script in either MAF or maf directory
+MAF_SCRIPT=""
+if [[ -e $PROJECTDIR/scripts/maf/maf2xlsx.R ]]; then
+    MAF_SCRIPT="$PROJECTDIR/scripts/maf/maf2xlsx.R"
+elif [[ -e $PROJECTDIR/scripts/MAF/maf2xlsx.R ]]; then
+    MAF_SCRIPT="$PROJECTDIR/scripts/MAF/maf2xlsx.R"
+fi
 
 if [[ -z "$PROJECTDIR" || -z "$STUDY" || -z "$VERSION" || -z "$RELEASE" ]]; then
     echo -e "\nUsage: $0 PROJECTDIR STUDY_PREFIX VERSION RELEASE\n"
     exit 1
-elif [[ ! -e $PROJECTDIR/scripts/MAF/maf2xlsx.R ]]; then
-    echo "Cannot find required script $PROJECTDIR/scripts/MAF/maf2xlsx.R"
+elif [[ -z "$MAF_SCRIPT" ]]; then
+    echo "Cannot find required script maf2xlsx.R in either $PROJECTDIR/scripts/maf/ or $PROJECTDIR/scripts/MAF/"
     exit 1
 fi
 
@@ -46,7 +52,7 @@ for cohort in all independent onePerPatient; do
         
             rsync -a --exclude '*maf' --exclude 'Rplots.pdf' $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/plots_keepPA_vaf_size_filt_matched/* $RELEASE/$REL_DIR/matched_samples/QC_keepPA/
         
-        Rscript $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/matched_samples/$STUDY-filtered_mutations_matched_${NAME}_keepPA.maf
+        Rscript $MAF_SCRIPT $RELEASE/$REL_DIR/matched_samples/$STUDY-filtered_mutations_matched_${NAME}_keepPA.maf
         
         cp -v $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/sample_list_matched.tsv $RELEASE/$REL_DIR/matched_samples/
         
@@ -57,7 +63,7 @@ for cohort in all independent onePerPatient; do
         
         rsync -a --exclude '*maf' --exclude 'Rplots.pdf' --exclude mutations_per_Mb.tsv $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/plots_keep_vaf_size_filt_matched/* $RELEASE/$REL_DIR/matched_samples/QC_keep/
         
-        Rscript $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/matched_samples/$STUDY-filtered_mutations_matched_${NAME}_keep.maf
+        Rscript $MAF_SCRIPT $RELEASE/$REL_DIR/matched_samples/$STUDY-filtered_mutations_matched_${NAME}_keep.maf
         
         cp -v $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/sample_list_matched.tsv $RELEASE/$REL_DIR/matched_samples/
         
@@ -67,7 +73,7 @@ for cohort in all independent onePerPatient; do
          
         rsync -a --exclude '*maf' --exclude 'Rplots.pdf' $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/plots_keepPA_vaf_size_filt/* $RELEASE/$REL_DIR/all_samples/QC_keepPA
         
-        Rscript $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/all_samples/$STUDY-filtered_mutations_all_${NAME}_keepPA.maf
+        Rscript $MAF_SCRIPT $RELEASE/$REL_DIR/all_samples/$STUDY-filtered_mutations_all_${NAME}_keepPA.maf
         
         cp -v $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/sample_list.tsv $RELEASE/$REL_DIR/all_samples/
          
@@ -78,7 +84,7 @@ for cohort in all independent onePerPatient; do
         
         rsync -a --exclude '*maf' --exclude 'Rplots.pdf' --exclude mutations_per_Mb.tsv $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/plots_keep_vaf_size_filt/* $RELEASE/$REL_DIR/all_samples/QC_keep/
         
-        Rscript $PROJECTDIR/scripts/MAF/maf2xlsx.R $RELEASE/$REL_DIR/all_samples/$STUDY-filtered_mutations_all_${NAME}_keep.maf
+        Rscript $MAF_SCRIPT $RELEASE/$REL_DIR/all_samples/$STUDY-filtered_mutations_all_${NAME}_keep.maf
         
         cp -v $PROJECTDIR/analysis/variants_combined/$VERSION/$cohort/sample_list.tsv $RELEASE/$REL_DIR/all_samples/
     fi
@@ -149,6 +155,3 @@ https://drive.google.com/drive/u/1/folders/1CjKEPyBFIm3hwbKi1ja4xybMyF6uOMOC
 END
 
 tree $RELEASE >> $RELEASE/README.txt
-
-
-
